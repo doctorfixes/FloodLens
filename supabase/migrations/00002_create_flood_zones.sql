@@ -33,6 +33,11 @@ CREATE INDEX IF NOT EXISTS idx_flood_zones_dfirm_id
 CREATE INDEX IF NOT EXISTS idx_flood_zones_source_feature_id
   ON public.flood_zones (source_feature_id);
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_flood_zones_unique_source_feature
+  ON public.flood_zones (state_fips, source_feature_id, eff_date)
+  NULLS NOT DISTINCT
+  WHERE source_feature_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_flood_zones_m_zone_code
   ON public.flood_zones (m_zone_code);
 

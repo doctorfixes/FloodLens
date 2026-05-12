@@ -138,7 +138,8 @@ WHERE geometry IS NOT NULL
     WHERE existing.state_fips = :'state_fips'::char(2)
       AND existing.source_feature_id = fld_ar_id
       AND existing.eff_date IS NOT DISTINCT FROM NULLIF(:'nfhl_eff_date', '')::date
-  );
+  )
+ON CONFLICT DO NOTHING;
 SQL
 
 # Count rows in DB for this state after ingestion.
