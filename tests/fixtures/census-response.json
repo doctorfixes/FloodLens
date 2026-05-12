@@ -1,0 +1,40 @@
+{
+  "result": {
+    "input": {
+      "address": "123 Main St, Austin TX 78701",
+      "benchmark": {
+        "isDefault": true,
+        "benchmarkDescription": "Public Address Ranges - Current Benchmark",
+        "id": "4",
+        "benchmarkName": "Public_AR_Current"
+      }
+    },
+    "addressMatches": [
+      {
+        "tigerLine": {
+          "side": "L",
+          "tigerLineId": "112518725"
+        },
+        "coordinates": {
+          "x": -97.74309,
+          "y": 30.26715
+        },
+        "addressComponents": {
+          "zip": "78701",
+          "streetName": "MAIN",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "",
+          "suffixDirection": "",
+          "fromAddress": "101",
+          "state": "TX",
+          "suffixType": "ST",
+          "toAddress": "199",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "123 MAIN ST, AUSTIN, TX, 78701"
+      }
+    ]
+  }
+}
