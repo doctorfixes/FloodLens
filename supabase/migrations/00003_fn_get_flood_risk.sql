@@ -44,6 +44,10 @@ AS $$
           OR fz.zone_subtype ILIKE '%0.2 PERCENT%'
           OR fz.zone_subtype ILIKE '%DEPTH LESS THAN 1 FOOT%'
           OR fz.zone_subtype ILIKE '%DRAINAGE AREA LESS THAN 1 SQUARE MILE%'
+          OR fz.zone_subtype ILIKE '%FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE%'
+          OR fz.zone_subtype ILIKE '%FLOOD HAZARD DUE TO NONACCREDITED LEVEE%'
+          OR fz.zone_subtype ILIKE '%FUTURE CONDITIONS%'
+          OR fz.zone_subtype ILIKE '%FUTURE CONDITONS%'
         ) THEN 6  -- Shaded X (500-year)
         WHEN fz.m_zone_code = 'X'                       THEN 7  -- Unshaded X (minimal)
         ELSE 99
@@ -77,6 +81,10 @@ AS $$
         OR mz.zone_subtype ILIKE '%0.2 PERCENT%'
         OR mz.zone_subtype ILIKE '%DEPTH LESS THAN 1 FOOT%'
         OR mz.zone_subtype ILIKE '%DRAINAGE AREA LESS THAN 1 SQUARE MILE%'
+        OR mz.zone_subtype ILIKE '%FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE%'
+        OR mz.zone_subtype ILIKE '%FLOOD HAZARD DUE TO NONACCREDITED LEVEE%'
+        OR mz.zone_subtype ILIKE '%FUTURE CONDITIONS%'
+        OR mz.zone_subtype ILIKE '%FUTURE CONDITONS%'
       )
         THEN 'Moderate Flood Hazard Area (500-Year)'
       WHEN mz.m_zone_code = 'X'
@@ -93,6 +101,10 @@ AS $$
         OR mz.zone_subtype ILIKE '%0.2 PERCENT%'
         OR mz.zone_subtype ILIKE '%DEPTH LESS THAN 1 FOOT%'
         OR mz.zone_subtype ILIKE '%DRAINAGE AREA LESS THAN 1 SQUARE MILE%'
+        OR mz.zone_subtype ILIKE '%FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE%'
+        OR mz.zone_subtype ILIKE '%FLOOD HAZARD DUE TO NONACCREDITED LEVEE%'
+        OR mz.zone_subtype ILIKE '%FUTURE CONDITIONS%'
+        OR mz.zone_subtype ILIKE '%FUTURE CONDITONS%'
       )
         THEN 'MODERATE'
       WHEN mz.m_zone_code = 'X'
@@ -113,6 +125,10 @@ AS $$
         OR mz.zone_subtype ILIKE '%0.2 PERCENT%'
         OR mz.zone_subtype ILIKE '%DEPTH LESS THAN 1 FOOT%'
         OR mz.zone_subtype ILIKE '%DRAINAGE AREA LESS THAN 1 SQUARE MILE%'
+        OR mz.zone_subtype ILIKE '%FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE%'
+        OR mz.zone_subtype ILIKE '%FLOOD HAZARD DUE TO NONACCREDITED LEVEE%'
+        OR mz.zone_subtype ILIKE '%FUTURE CONDITIONS%'
+        OR mz.zone_subtype ILIKE '%FUTURE CONDITONS%'
       )
         THEN 'Moderate Risk (500-Year Floodplain). Flood insurance is recommended but not federally required.'
       WHEN mz.m_zone_code = 'X'

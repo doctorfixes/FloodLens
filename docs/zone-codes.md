@@ -55,7 +55,7 @@ These areas are outside the SFHA and have a **lower than 0.2% annual chance of f
 
 ## Notes
 
-- **Zone X** can appear as both shaded (moderate risk) and unshaded (minimal risk). FloodLens uses FEMA's `ZONE_SUBTY` details, plus nonzero depth where present, to distinguish moderate-risk shaded X from minimal-risk unshaded X.
+- **Zone X** can appear as both shaded (moderate risk) and unshaded (minimal risk). FloodLens uses FEMA's `ZONE_SUBTY` details, including 0.2% annual chance flood hazard, future-conditions flood hazard, and non-accredited levee hazard subtypes, plus nonzero depth where present, to distinguish moderate-risk shaded X from minimal-risk unshaded X.
 - **BFE** (Base Flood Elevation) is the elevation at which there is a 1% annual chance of flooding. It is the standard reference point for floodplain management and insurance rating.
 - Zone designations are assigned at the FIRM panel level and reflect conditions at the `effective_date` of that panel.
 
