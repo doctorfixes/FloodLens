@@ -43,3 +43,6 @@ supabase db push --dry-run
 
 Full production validation requires a Supabase project, ingested NFHL state data,
 Zuplo API keys, and Stripe metered billing credentials.
+
+Airflow workers should install `dags/requirements.txt` in addition to providing
+GDAL/ogr2ogr and psql on the worker PATH.

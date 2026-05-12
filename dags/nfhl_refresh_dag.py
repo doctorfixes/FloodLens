@@ -13,6 +13,7 @@ The flood_zones table is never truncated. Row counts only ever increase.
 
 Requirements:
   - Apache Airflow 2.x
+  - Python packages from dags/requirements.txt
   - ogr2ogr (GDAL >= 3.4) on the Airflow worker PATH
   - SUPABASE_DB_URL set as an Airflow Variable or environment variable
 """
