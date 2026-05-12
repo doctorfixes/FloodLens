@@ -45,11 +45,18 @@ DATA_DIR = Path("/tmp/floodlens_nfhl")
 SCRIPT_PATH = Path("/opt/airflow/scripts/ingest_nfhl.sh")
 
 
+def validate_state_fips(state_fips: str) -> None:
+    """Raises ValueError unless state_fips is a two-digit FIPS code."""
+    if len(state_fips) != 2 or not state_fips.isdigit():
+        raise ValueError(f"state_fips must be a two-digit FIPS code: {state_fips}")
+
+
 def download_state_shapefile(state_fips: str) -> Path:
     """
     Downloads the NFHL state shapefile zip from FEMA MSC.
     Extracts and returns the path to S_FLD_HAZ_AR*.shp.
     """
+    validate_state_fips(state_fips)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     zip_path = DATA_DIR / f"NFHL_{state_fips}.zip"
 
@@ -87,6 +94,7 @@ def check_and_refresh(state_fips: str) -> None:
     Main DAG task. Compares FEMA and DB effective dates.
     Triggers ingestion only when FEMA has newer data.
     """
+    validate_state_fips(state_fips)
     db_url = Variable.get(
         "SUPABASE_DB_URL",
         default_var=os.environ.get("SUPABASE_DB_URL", ""),

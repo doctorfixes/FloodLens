@@ -17,6 +17,11 @@ DEST_DIR="${DATA_DIR}/state_${STATE_FIPS}"
 ZIP_FILE="${DEST_DIR}/NFHL_${STATE_FIPS}.zip"
 DOWNLOAD_URL="https://msc.fema.gov/portal/downloadProduct?productTypeID=NFHL&productSubTypeID=State&productVersionID=${STATE_FIPS}"
 
+if [[ ! "${STATE_FIPS}" =~ ^[0-9]{2}$ ]]; then
+  echo "STATE_FIPS must be a two-digit FIPS code" >&2
+  exit 1
+fi
+
 mkdir -p "${DEST_DIR}"
 
 echo "[download_nfhl] Downloading NFHL state ${STATE_FIPS}"
