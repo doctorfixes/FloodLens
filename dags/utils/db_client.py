@@ -22,15 +22,13 @@ def get_current_eff_date(state_fips: str, db_url: str) -> str | None:
     """
     validate_state_fips(state_fips)
     try:
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT MAX(eff_date) FROM public.flood_zones WHERE state_fips = %s",
-            (state_fips,),
-        )
-        result = cur.fetchone()
-        cur.close()
-        conn.close()
+        with psycopg2.connect(db_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT MAX(eff_date) FROM public.flood_zones WHERE state_fips = %s",
+                    (state_fips,),
+                )
+                result = cur.fetchone()
         return result[0].isoformat() if result and result[0] else None
     except Exception as exc:
         log.warning("DB eff_date query failed for state %s: %s", state_fips, exc)
