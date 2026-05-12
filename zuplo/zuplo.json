@@ -1,0 +1,50 @@
+{
+  "version": "3",
+  "routes": [
+    {
+      "path": "/v1/determine-zone",
+      "methods": ["GET"],
+      "handler": "url-forward",
+      "options": {
+        "forwardTo": "https://${env.SUPABASE_PROJECT_ID}.supabase.co/functions/v1/determine-zone"
+      },
+      "policies": {
+        "inbound": [
+          "api-key-auth",
+          "rate-limit-by-plan"
+        ],
+        "outbound": [
+          "stripe-metered-billing"
+        ]
+      }
+    }
+  ],
+  "policies": [
+    {
+      "name": "api-key-auth",
+      "policyType": "api-key-inbound"
+    },
+    {
+      "name": "rate-limit-by-plan",
+      "policyType": "custom-code-inbound",
+      "options": {
+        "scriptPath": "./policies/rate-limit-by-plan.ts"
+      }
+    },
+    {
+      "name": "stripe-metered-billing",
+      "policyType": "custom-code-outbound",
+      "options": {
+        "scriptPath": "./policies/stripe-metered-billing.ts"
+      }
+    }
+  ],
+  "environments": {
+    "production": {
+      "name": "Production"
+    },
+    "staging": {
+      "name": "Staging"
+    }
+  }
+}

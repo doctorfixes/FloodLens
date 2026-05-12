@@ -1,0 +1,27 @@
+{
+  "results": [
+    {
+      "formatted_address": "123 Main St, Austin, TX 78701, USA",
+      "geometry": {
+        "location": {
+          "lat": 30.26715,
+          "lng": -97.74309
+        },
+        "location_type": "ROOFTOP",
+        "viewport": {
+          "northeast": {
+            "lat": 30.2685,
+            "lng": -97.7417
+          },
+          "southwest": {
+            "lat": 30.2658,
+            "lng": -97.7444
+          }
+        }
+      },
+      "place_id": "ChIJAVkDPzdYQIYRd5JUCqKv0bA",
+      "types": ["street_address"]
+    }
+  ],
+  "status": "OK"
+}
