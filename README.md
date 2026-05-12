@@ -31,6 +31,9 @@ Every response, including errors, includes a FEMA NFHL disclaimer.
 - `zuplo/` - Gateway route and policy configuration.
 - `docs/` - API reference, setup guide, data provenance, and FEMA zone codes.
 
+Free-tier keys should apply both `rate-limit-free.ts` for the 50 request/month
+quota and `rate-limit-free-burst.ts` for the 10 request/minute spike limit.
+
 ## Local Validation
 
 ```bash
