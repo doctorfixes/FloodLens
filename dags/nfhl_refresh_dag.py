@@ -16,6 +16,7 @@ Requirements:
   - Python packages from dags/requirements.txt
   - ogr2ogr (GDAL >= 3.4) on the Airflow worker PATH
   - SUPABASE_DB_URL set as an Airflow Variable or environment variable
+  - FLOODLENS_INGEST_SCRIPT_PATH optionally set to override script location
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ log = logging.getLogger(__name__)
 TARGET_STATES: list[str] = ["12", "48", "06", "36", "22"]
 
 DATA_DIR = Path("/tmp/floodlens_nfhl")
-SCRIPT_PATH = Path("/opt/airflow/scripts/ingest_nfhl.sh")
+DEFAULT_SCRIPT_PATH = Path("/opt/airflow/scripts/ingest_nfhl.sh")
 
 
 def validate_state_fips(state_fips: str) -> None:
@@ -124,9 +125,21 @@ def check_and_refresh(state_fips: str) -> None:
     )
 
     shp_path = download_state_shapefile(state_fips)
+    script_path = Path(
+        Variable.get(
+            "FLOODLENS_INGEST_SCRIPT_PATH",
+            default_var=os.environ.get(
+                "FLOODLENS_INGEST_SCRIPT_PATH",
+                str(DEFAULT_SCRIPT_PATH),
+            ),
+        )
+    )
+
+    if not script_path.exists():
+        raise FileNotFoundError(f"NFHL ingestion script not found: {script_path}")
 
     result = subprocess.run(
-        [str(SCRIPT_PATH), str(shp_path), state_fips],
+        [str(script_path), str(shp_path), state_fips],
         capture_output=True,
         text=True,
         env={**os.environ, "SUPABASE_DB_URL": db_url, "NFHL_EFF_DATE": fema_date},
