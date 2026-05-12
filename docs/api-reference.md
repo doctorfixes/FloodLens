@@ -36,7 +36,7 @@ Returns a FEMA flood zone determination for a US street address.
     "insurance_note": "Minimal Risk. Outside the 500-Year floodplain. Flood insurance is optional.",
     "bfe": null,
     "depth": null,
-    "panel_number": "11001C0097",
+    "panel_number": null,
     "dfirm_id": "11001C",
     "eff_date": "2010-09-27",
     "disclaimer": "This result is derived from FEMA National Flood Hazard Layer (NFHL) data..."
@@ -49,6 +49,9 @@ Returns a FEMA flood zone determination for a US street address.
 
 If the coordinate is outside all ingested polygons, `determination` is `null`
 and `unmapped` is `true`. The top-level `disclaimer` is still present.
+
+`determination.panel_number` can be `null` when the current ingestion source
+does not include a panel identifier on the matched flood hazard polygon.
 
 ## Error Response
 
