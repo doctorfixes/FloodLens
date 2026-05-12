@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.flood_zones (
 
   -- FEMA NFHL source columns. Field names match the .dbf attribute table.
   dfirm_id        TEXT         NOT NULL,    -- DFIRM panel identifier e.g. "12086C"
+  source_feature_id TEXT,                  -- FEMA FLD_AR_ID feature identifier
   panel_number    TEXT,                     -- Full panel number e.g. "12086C0465"
   m_zone_code     TEXT         NOT NULL,    -- Zone code e.g. "AE", "X", "VE"
   zone_subtype    TEXT,                     -- Subtype distinguishes shaded/unshaded X
@@ -28,6 +29,9 @@ CREATE TABLE IF NOT EXISTS public.flood_zones (
 -- Do not add the GIST spatial index here -- it runs in 00002b with CONCURRENTLY.
 CREATE INDEX IF NOT EXISTS idx_flood_zones_dfirm_id
   ON public.flood_zones (dfirm_id);
+
+CREATE INDEX IF NOT EXISTS idx_flood_zones_source_feature_id
+  ON public.flood_zones (source_feature_id);
 
 CREATE INDEX IF NOT EXISTS idx_flood_zones_m_zone_code
   ON public.flood_zones (m_zone_code);

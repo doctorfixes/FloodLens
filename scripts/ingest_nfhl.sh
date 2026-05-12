@@ -96,6 +96,7 @@ psql "${DB_URL}" -v ON_ERROR_STOP=1 \
 INSERT INTO public.flood_zones (
   geometry,
   dfirm_id,
+  source_feature_id,
   panel_number,
   m_zone_code,
   zone_subtype,
@@ -111,6 +112,7 @@ INSERT INTO public.flood_zones (
 SELECT
   ST_Multi(geometry)::geometry(MultiPolygon, 4326) AS geometry,
   dfirm_id,
+  fld_ar_id AS source_feature_id,
   NULL::text AS panel_number,
   fld_zone AS m_zone_code,
   NULLIF(zone_subty, ' ') AS zone_subtype,
@@ -128,7 +130,15 @@ SELECT
 FROM :staging_table
 WHERE geometry IS NOT NULL
   AND dfirm_id IS NOT NULL
-  AND fld_zone IS NOT NULL;
+  AND fld_ar_id IS NOT NULL
+  AND fld_zone IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.flood_zones existing
+    WHERE existing.state_fips = :'state_fips'::char(2)
+      AND existing.source_feature_id = fld_ar_id
+      AND existing.eff_date IS NOT DISTINCT FROM NULLIF(:'nfhl_eff_date', '')::date
+  );
 SQL
 
 # Count rows in DB for this state after ingestion.
