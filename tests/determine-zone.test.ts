@@ -178,6 +178,22 @@ Deno.test("returns 500 when spatial lookup fails", async () => {
   assertExists(body.disclaimer);
 });
 
+Deno.test("returns 500 with disclaimer when database client creation throws", async () => {
+  const response = await handleDetermineZoneRequest(
+    makeRequest({ address: "123 Main St" }),
+    mockDeps({
+      createFloodRiskClient: () => {
+        throw new Error("missing Supabase configuration");
+      },
+    }),
+  );
+
+  assertEquals(response.status, 500);
+  const body = await response.json();
+  assertEquals(body.code, "DB_ERROR");
+  assertEquals(body.disclaimer, DISCLAIMER);
+});
+
 Deno.test("Census geocoder fixture has expected structure", () => {
   const matches = censusFixture?.result?.addressMatches;
   assertExists(matches);

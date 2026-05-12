@@ -116,10 +116,17 @@ export async function handleDetermineZoneRequest(
     );
   }
 
-  const supabase = deps.createFloodRiskClient();
-  const { data, error } = await supabase
-    .rpc("fn_get_flood_risk", { p_lat: coords.lat, p_lng: coords.lng })
-    .returns<FloodRiskRow[]>();
+  let lookupResult: RpcResult<FloodRiskRow[]>;
+  try {
+    const supabase = deps.createFloodRiskClient();
+    lookupResult = await supabase
+      .rpc("fn_get_flood_risk", { p_lat: coords.lat, p_lng: coords.lng })
+      .returns<FloodRiskRow[]>();
+  } catch {
+    return errorResponse("Spatial query failed", ERROR_CODES.DB_ERROR, 500);
+  }
+
+  const { data, error } = lookupResult;
 
   if (error) {
     return errorResponse("Spatial query failed", ERROR_CODES.DB_ERROR, 500);
