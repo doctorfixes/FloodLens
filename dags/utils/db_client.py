@@ -10,6 +10,8 @@ import logging
 
 import psycopg2
 
+from utils.validation import validate_state_fips
+
 log = logging.getLogger(__name__)
 
 
@@ -18,6 +20,7 @@ def get_current_eff_date(state_fips: str, db_url: str) -> str | None:
     Returns the most recent eff_date stored in flood_zones for the given
     state as an ISO date string, or None if the state has no rows.
     """
+    validate_state_fips(state_fips)
     try:
         conn = psycopg2.connect(db_url)
         cur = conn.cursor()

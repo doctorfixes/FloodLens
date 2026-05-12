@@ -11,6 +11,8 @@ from datetime import datetime
 
 import requests
 
+from utils.validation import validate_state_fips
+
 log = logging.getLogger(__name__)
 
 NFHL_MAP_SERVER = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer"
@@ -25,6 +27,7 @@ def get_latest_eff_date(state_fips: str) -> str | None:
 
     FEMA returns timestamps as epoch milliseconds.
     """
+    validate_state_fips(state_fips)
     url = f"{NFHL_MAP_SERVER}/{FIRM_PANEL_LAYER_ID}/query"
     params = {
         # FEMA uses 9999-09-09 on some not-printed panels. Exclude future
