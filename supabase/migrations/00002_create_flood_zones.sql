@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.flood_zones (
   dfirm_id        TEXT         NOT NULL,    -- DFIRM panel identifier e.g. "12086C"
   panel_number    TEXT,                     -- Full panel number e.g. "12086C0465"
   m_zone_code     TEXT         NOT NULL,    -- Zone code e.g. "AE", "X", "VE"
+  zone_subtype    TEXT,                     -- Subtype distinguishes shaded/unshaded X
   bfe             NUMERIC(8,2),             -- Base Flood Elevation in feet NAVD88
   static_bfe      NUMERIC(8,2),             -- Static BFE where no profile exists
   depth           NUMERIC(8,2),             -- Depth in Zone AO areas

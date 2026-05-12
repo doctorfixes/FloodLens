@@ -21,6 +21,7 @@ AS $$
   WITH matched_zone AS (
     SELECT
       fz.m_zone_code,
+      fz.zone_subtype,
       fz.bfe,
       fz.static_bfe,
       fz.depth,
@@ -37,7 +38,13 @@ AS $$
         WHEN fz.m_zone_code = 'A'                       THEN 3  -- SFHA without BFE
         WHEN fz.m_zone_code = 'AR'                      THEN 4  -- Restoration zone
         WHEN fz.m_zone_code = 'D'                       THEN 5  -- Undetermined
-        WHEN fz.m_zone_code LIKE 'X%' AND fz.depth > 0  THEN 6  -- Shaded X (500-year)
+        WHEN fz.m_zone_code LIKE 'X%' AND (
+          fz.depth > 0
+          OR fz.zone_subtype ILIKE '%0.2 PCT%'
+          OR fz.zone_subtype ILIKE '%0.2 PERCENT%'
+          OR fz.zone_subtype ILIKE '%DEPTH LESS THAN 1 FOOT%'
+          OR fz.zone_subtype ILIKE '%DRAINAGE AREA LESS THAN 1 SQUARE MILE%'
+        ) THEN 6  -- Shaded X (500-year)
         WHEN fz.m_zone_code = 'X'                       THEN 7  -- Unshaded X (minimal)
         ELSE 99
       END AS risk_priority
@@ -64,7 +71,13 @@ AS $$
         THEN 'Special Flood Hazard Area - Restoration Zone'
       WHEN mz.m_zone_code = 'D'
         THEN 'Undetermined Risk Area'
-      WHEN mz.m_zone_code LIKE 'X%' AND mz.depth > 0
+      WHEN mz.m_zone_code LIKE 'X%' AND (
+        mz.depth > 0
+        OR mz.zone_subtype ILIKE '%0.2 PCT%'
+        OR mz.zone_subtype ILIKE '%0.2 PERCENT%'
+        OR mz.zone_subtype ILIKE '%DEPTH LESS THAN 1 FOOT%'
+        OR mz.zone_subtype ILIKE '%DRAINAGE AREA LESS THAN 1 SQUARE MILE%'
+      )
         THEN 'Moderate Flood Hazard Area (500-Year)'
       WHEN mz.m_zone_code = 'X'
         THEN 'Minimal Flood Hazard Area'
@@ -74,7 +87,13 @@ AS $$
     CASE
       WHEN mz.m_zone_code IN ('VE','V1-30','V','AE','AO','AH','A99','A','AR')
         THEN 'HIGH'
-      WHEN mz.m_zone_code LIKE 'X%' AND mz.depth > 0
+      WHEN mz.m_zone_code LIKE 'X%' AND (
+        mz.depth > 0
+        OR mz.zone_subtype ILIKE '%0.2 PCT%'
+        OR mz.zone_subtype ILIKE '%0.2 PERCENT%'
+        OR mz.zone_subtype ILIKE '%DEPTH LESS THAN 1 FOOT%'
+        OR mz.zone_subtype ILIKE '%DRAINAGE AREA LESS THAN 1 SQUARE MILE%'
+      )
         THEN 'MODERATE'
       WHEN mz.m_zone_code = 'X'
         THEN 'MINIMAL'
@@ -88,7 +107,13 @@ AS $$
         THEN 'High Risk - Coastal. Flood insurance REQUIRED for federally backed mortgages. Mandatory purchase requirement applies.'
       WHEN mz.m_zone_code IN ('AE','AO','AH','A99','A','AR')
         THEN 'High Risk. Flood insurance REQUIRED for federally backed mortgages. Mandatory purchase requirement applies.'
-      WHEN mz.m_zone_code LIKE 'X%' AND mz.depth > 0
+      WHEN mz.m_zone_code LIKE 'X%' AND (
+        mz.depth > 0
+        OR mz.zone_subtype ILIKE '%0.2 PCT%'
+        OR mz.zone_subtype ILIKE '%0.2 PERCENT%'
+        OR mz.zone_subtype ILIKE '%DEPTH LESS THAN 1 FOOT%'
+        OR mz.zone_subtype ILIKE '%DRAINAGE AREA LESS THAN 1 SQUARE MILE%'
+      )
         THEN 'Moderate Risk (500-Year Floodplain). Flood insurance is recommended but not federally required.'
       WHEN mz.m_zone_code = 'X'
         THEN 'Minimal Risk. Outside the 500-Year floodplain. Flood insurance is optional.'
