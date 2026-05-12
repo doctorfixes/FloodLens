@@ -67,7 +67,11 @@ export async function handleDetermineZoneRequest(
   deps: HandlerDependencies = defaultDependencies(),
 ): Promise<Response> {
   if (req.method !== "POST") {
-    return errorResponse("Method not allowed", ERROR_CODES.METHOD_NOT_ALLOWED, 405);
+    return errorResponse(
+      "Method not allowed",
+      ERROR_CODES.METHOD_NOT_ALLOWED,
+      405,
+    );
   }
 
   let requestBody: unknown;
@@ -79,7 +83,11 @@ export async function handleDetermineZoneRequest(
 
   const address = readAddress(requestBody);
   if (!address) {
-    return errorResponse("address is required", ERROR_CODES.MISSING_ADDRESS, 400);
+    return errorResponse(
+      "address is required",
+      ERROR_CODES.MISSING_ADDRESS,
+      400,
+    );
   }
 
   let coords = await deps.geocodeCensus(address);
@@ -133,5 +141,5 @@ export async function handleDetermineZoneRequest(
 }
 
 if (import.meta.main) {
-  serve(handleDetermineZoneRequest);
+  serve((req: Request): Promise<Response> => handleDetermineZoneRequest(req));
 }

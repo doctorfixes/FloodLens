@@ -7,7 +7,7 @@ import { ZuploContext, ZuploRequest } from "@zuplo/runtime";
 export default async function policy(
   response: Response,
   request: ZuploRequest,
-  context: ZuploContext
+  context: ZuploContext,
 ): Promise<Response> {
   if (response.status !== 200) return response;
 

@@ -9,7 +9,9 @@ const GOOGLE_TIMEOUT_MS = 5000;
  * Known limitations: rural addresses, multi-unit buildings, PO boxes.
  * Returns null on any failure - caller decides whether to fall back.
  */
-export async function geocodeCensus(address: string): Promise<Coordinates | null> {
+export async function geocodeCensus(
+  address: string,
+): Promise<Coordinates | null> {
   const url = new URL(
     "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress",
   );
@@ -30,7 +32,9 @@ export async function geocodeCensus(address: string): Promise<Coordinates | null
     if (!Array.isArray(matches) || matches.length === 0) return null;
 
     const coords = matches[0]?.coordinates;
-    if (typeof coords?.x !== "number" || typeof coords?.y !== "number") return null;
+    if (typeof coords?.x !== "number" || typeof coords?.y !== "number") {
+      return null;
+    }
 
     // Census returns x = longitude, y = latitude.
     return { lat: coords.y, lng: coords.x };
@@ -61,12 +65,17 @@ export async function geocodeGoogle(
     if (!res.ok) return null;
 
     const data = await res.json();
-    if (data.status !== "OK" || !Array.isArray(data.results) || data.results.length === 0) {
+    if (
+      data.status !== "OK" || !Array.isArray(data.results) ||
+      data.results.length === 0
+    ) {
       return null;
     }
 
     const loc = data.results[0]?.geometry?.location;
-    if (typeof loc?.lat !== "number" || typeof loc?.lng !== "number") return null;
+    if (typeof loc?.lat !== "number" || typeof loc?.lng !== "number") {
+      return null;
+    }
 
     return { lat: loc.lat, lng: loc.lng };
   } catch {

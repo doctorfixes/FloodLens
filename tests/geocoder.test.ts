@@ -7,14 +7,14 @@ import {
 
 const censusFixture = JSON.parse(
   await Deno.readTextFile(
-    new URL("./fixtures/census-response.json", import.meta.url)
-  )
+    new URL("./fixtures/census-response.json", import.meta.url),
+  ),
 );
 
 const googleFixture = JSON.parse(
   await Deno.readTextFile(
-    new URL("./fixtures/google-response.json", import.meta.url)
-  )
+    new URL("./fixtures/google-response.json", import.meta.url),
+  ),
 );
 
 function mockFetch(body: unknown, ok = true): typeof fetch {
@@ -23,7 +23,7 @@ function mockFetch(body: unknown, ok = true): typeof fetch {
       new Response(JSON.stringify(body), {
         status: ok ? 200 : 502,
         headers: { "Content-Type": "application/json" },
-      })
+      }),
     );
 }
 

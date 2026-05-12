@@ -6,8 +6,8 @@ import {
 } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
   type FloodRiskClient,
-  type HandlerDependencies,
   handleDetermineZoneRequest,
+  type HandlerDependencies,
 } from "../supabase/functions/determine-zone/index.ts";
 import {
   DISCLAIMER,
@@ -17,14 +17,14 @@ import {
 
 const floodRiskFixture = JSON.parse(
   await Deno.readTextFile(
-    new URL("./fixtures/flood-risk-row.json", import.meta.url)
-  )
+    new URL("./fixtures/flood-risk-row.json", import.meta.url),
+  ),
 );
 
 const censusFixture = JSON.parse(
   await Deno.readTextFile(
-    new URL("./fixtures/census-response.json", import.meta.url)
-  )
+    new URL("./fixtures/census-response.json", import.meta.url),
+  ),
 );
 
 function makeRequest(body: unknown, method = "POST"): Request {
@@ -37,9 +37,15 @@ function makeRequest(body: unknown, method = "POST"): Request {
   });
 }
 
-function mockSupabaseClient(data: unknown, error: unknown = null): FloodRiskClient {
+function mockSupabaseClient(
+  data: unknown,
+  error: unknown = null,
+): FloodRiskClient {
   return {
-    rpc: (_functionName: string, _params: { p_lat: number; p_lng: number }) => ({
+    rpc: (
+      _functionName: string,
+      _params: { p_lat: number; p_lng: number },
+    ) => ({
       returns<T>(): Promise<{ data: T | null; error: unknown }> {
         return Promise.resolve({ data: data as T, error });
       },
@@ -47,7 +53,9 @@ function mockSupabaseClient(data: unknown, error: unknown = null): FloodRiskClie
   };
 }
 
-function mockDeps(overrides: Partial<HandlerDependencies> = {}): HandlerDependencies {
+function mockDeps(
+  overrides: Partial<HandlerDependencies> = {},
+): HandlerDependencies {
   return {
     geocodeCensus: (_address: string) =>
       Promise.resolve({ lat: 30.26715, lng: -97.74309 }),
@@ -86,7 +94,10 @@ Deno.test("returns 405 when method is not POST", async () => {
 });
 
 Deno.test("returns 400 when address is missing", async () => {
-  const response = await handleDetermineZoneRequest(makeRequest({}), mockDeps());
+  const response = await handleDetermineZoneRequest(
+    makeRequest({}),
+    mockDeps(),
+  );
   assertEquals(response.status, 400);
   const body = await response.json();
   assertEquals(body.code, "MISSING_ADDRESS");
