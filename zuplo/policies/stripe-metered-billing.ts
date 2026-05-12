@@ -12,25 +12,38 @@ export default async function policy(
   if (response.status !== 200) return response;
 
   const stripeKey = context.environment.STRIPE_SECRET_KEY;
-  const customerId = request.user?.data?.stripeCustomerId as string | undefined;
+  const customerId = request.user?.data?.stripeCustomerId;
 
   // Free-tier keys without a Stripe customer ID are not billed.
   // Free-tier enforcement is handled by the rate-limit-free policy.
-  if (!customerId || !stripeKey) return response;
+  if (typeof customerId !== "string" || customerId.length === 0 || !stripeKey) {
+    return response;
+  }
 
   try {
-    await fetch("https://api.stripe.com/v1/billing/meter_events", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${stripeKey}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+    const stripeResponse = await fetch(
+      "https://api.stripe.com/v1/billing/meter_events",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${stripeKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          event_name: "flood_zone_determination",
+          "payload[stripe_customer_id]": customerId,
+          "payload[value]": "1",
+        }),
       },
-      body: new URLSearchParams({
-        event_name: "flood_zone_determination",
-        "payload[stripe_customer_id]": customerId,
-        "payload[value]": "1",
-      }),
-    });
+    );
+
+    if (!stripeResponse.ok) {
+      context.log.error("Stripe meter event failed", {
+        customerId,
+        status: stripeResponse.status,
+        body: await stripeResponse.text(),
+      });
+    }
   } catch (err) {
     // Log billing failures without blocking the response.
     // A failed billing event should not degrade the API caller's experience.
