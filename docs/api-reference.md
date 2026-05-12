@@ -74,7 +74,8 @@ Every error response includes a disclaimer.
 ## Rate Limits and Billing
 
 Rate limits, API keys, tiers, and Stripe metering are enforced in Zuplo. The
-Supabase Edge Function has no billing or tier awareness.
+Supabase Edge Function has no billing or tier awareness. Free-tier keys should
+apply both the monthly quota policy and the one-minute burst policy.
 
 | Tier | Included | Overage | Rate Limit |
 | --- | --- | --- | --- |
