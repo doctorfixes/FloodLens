@@ -24,6 +24,7 @@ The main response fields are:
 - `geocode_source`: `census` or `google`.
 - `determination.zone_code`: FEMA zone code such as `AE`, `VE`, `X`, or `D`.
 - `determination.risk_level`: `HIGH`, `MODERATE`, `MINIMAL`, `UNDETERMINED`, or `UNKNOWN`.
+- `determination.panel_number`: FIRM panel identifier when available; otherwise `null`.
 - `unmapped`: `true` when no ingested polygon covers the coordinate.
 - `disclaimer`: present on every success and error response.
 
