@@ -22,6 +22,7 @@ AS $$
     SELECT
       fz.m_zone_code,
       fz.bfe,
+      fz.static_bfe,
       fz.depth,
       fz.panel_number,
       fz.dfirm_id,
@@ -96,7 +97,7 @@ AS $$
       ELSE 'Zone not mapped. Contact the local floodplain administrator for an official determination.'
     END AS insurance_note,
 
-    mz.bfe,
+    COALESCE(mz.bfe, mz.static_bfe) AS bfe,
     mz.depth,
     mz.panel_number,
     mz.dfirm_id,
