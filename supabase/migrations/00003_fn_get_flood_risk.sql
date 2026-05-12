@@ -134,6 +134,17 @@ AS $$
   FROM matched_zone mz;
 $$;
 
--- Grant execute access to both Supabase default roles.
-GRANT EXECUTE ON FUNCTION public.fn_get_flood_risk(DOUBLE PRECISION, DOUBLE PRECISION)
-  TO anon, authenticated;
+-- Grant execute access to Supabase default roles when they are present.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    GRANT EXECUTE ON FUNCTION public.fn_get_flood_risk(DOUBLE PRECISION, DOUBLE PRECISION)
+      TO anon;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    GRANT EXECUTE ON FUNCTION public.fn_get_flood_risk(DOUBLE PRECISION, DOUBLE PRECISION)
+      TO authenticated;
+  END IF;
+END;
+$$;
