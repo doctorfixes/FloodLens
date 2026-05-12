@@ -19,6 +19,7 @@ All SFHA zones produce `risk_level: "HIGH"` in the API response.
 | **AR** | SFHA that will be restored to a pre-FIRM status once a flood-control project is completed. |
 | **A99** | SFHA to be protected from the 1% annual chance flood by a federal flood protection system under construction. |
 | **V** | Coastal SFHA subject to wave action. No BFE determined. |
+| **V1-V30** | Legacy coastal SFHA subject to wave action with BFE determined. |
 | **VE** | Coastal SFHA with wave action. BFE determined. Highest-risk coastal zone. |
 
 ---

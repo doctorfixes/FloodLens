@@ -33,7 +33,9 @@ AS $$
       -- When a point falls on the edge of two zones, the higher-risk zone wins.
       -- This is the conservative and legally defensible behavior.
       CASE
-        WHEN fz.m_zone_code IN ('VE','V1-30','V')       THEN 1  -- Coastal high hazard
+        WHEN fz.m_zone_code IN ('VE','V1-30','V')
+          OR fz.m_zone_code ~ '^V([1-9]|[12][0-9]|30)$'
+          THEN 1  -- Coastal high hazard
         WHEN fz.m_zone_code IN ('AE','AO','AH','A99')   THEN 2  -- SFHA with BFE
         WHEN fz.m_zone_code = 'A'                       THEN 3  -- SFHA without BFE
         WHEN fz.m_zone_code = 'AR'                      THEN 4  -- Restoration zone
@@ -68,6 +70,7 @@ AS $$
 
     CASE
       WHEN mz.m_zone_code IN ('VE','V1-30','V')
+        OR mz.m_zone_code ~ '^V([1-9]|[12][0-9]|30)$'
         THEN 'Coastal High Hazard Area'
       WHEN mz.m_zone_code IN ('AE','AO','AH','A99','A')
         THEN 'Special Flood Hazard Area (SFHA)'
@@ -94,6 +97,7 @@ AS $$
 
     CASE
       WHEN mz.m_zone_code IN ('VE','V1-30','V','AE','AO','AH','A99','A','AR')
+        OR mz.m_zone_code ~ '^V([1-9]|[12][0-9]|30)$'
         THEN 'HIGH'
       WHEN mz.m_zone_code LIKE 'X%' AND (
         mz.depth > 0
@@ -116,6 +120,7 @@ AS $$
 
     CASE
       WHEN mz.m_zone_code IN ('VE','V1-30','V')
+        OR mz.m_zone_code ~ '^V([1-9]|[12][0-9]|30)$'
         THEN 'High Risk - Coastal. Flood insurance REQUIRED for federally backed mortgages. Mandatory purchase requirement applies.'
       WHEN mz.m_zone_code IN ('AE','AO','AH','A99','A','AR')
         THEN 'High Risk. Flood insurance REQUIRED for federally backed mortgages. Mandatory purchase requirement applies.'
