@@ -1,9 +1,4 @@
-import {
-  ZuploContext,
-  ZuploRequest,
-  HttpProblems,
-  RateLimitInboundPolicy,
-} from "@zuplo/runtime";
+import { RateLimitInboundPolicy } from "@zuplo/runtime";
 
 /**
  * rate-limit-free.ts
@@ -13,5 +8,5 @@ import {
 export default RateLimitInboundPolicy({
   rateLimitBy: "consumer",
   requestsAllowed: 50,
-  timeWindowMinutes: 60 * 24 * 30, // 30-day rolling window (43,200 minutes)
+  timeWindowMinutes: 60 * 24 * 30, // 43,200 minutes = 30 days
 });
