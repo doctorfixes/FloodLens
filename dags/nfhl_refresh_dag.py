@@ -120,7 +120,7 @@ def check_and_refresh(state_fips: str) -> None:
         [str(SCRIPT_PATH), str(shp_path), state_fips],
         capture_output=True,
         text=True,
-        env={**os.environ, "SUPABASE_DB_URL": db_url},
+        env={**os.environ, "SUPABASE_DB_URL": db_url, "NFHL_EFF_DATE": fema_date},
     )
 
     if result.returncode != 0:

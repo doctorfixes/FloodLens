@@ -18,7 +18,7 @@ The NFHL is a GIS database that contains the digital flood hazard information fr
 The NFHL is published by FEMA under public domain and is freely available via:
 
 - **FEMA Map Service Center (MSC):** https://msc.fema.gov/portal/home
-- **FEMA NFHL REST API:** https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer
+- **FEMA NFHL REST API:** https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer
 
 No commercial restrictions apply.
 
