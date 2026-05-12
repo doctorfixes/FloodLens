@@ -36,6 +36,7 @@ import requests
 
 from utils.fema_client import get_latest_eff_date
 from utils.db_client import get_current_eff_date
+from utils.validation import validate_state_fips
 
 log = logging.getLogger(__name__)
 
@@ -45,12 +46,6 @@ TARGET_STATES: list[str] = ["12", "48", "06", "36", "22"]
 
 DATA_DIR = Path("/tmp/floodlens_nfhl")
 DEFAULT_SCRIPT_PATH = Path("/opt/airflow/scripts/ingest_nfhl.sh")
-
-
-def validate_state_fips(state_fips: str) -> None:
-    """Raises ValueError unless state_fips is a two-digit FIPS code."""
-    if len(state_fips) != 2 or not state_fips.isdigit():
-        raise ValueError(f"state_fips must be a two-digit FIPS code: {state_fips}")
 
 
 def download_state_shapefile(state_fips: str) -> Path:
