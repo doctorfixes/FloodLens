@@ -1,111 +1,181 @@
-// determine-zone.test.ts — Edge Function unit tests (Deno)
+// determine-zone.test.ts - Edge Function handler unit tests (Deno)
 
 import {
   assertEquals,
   assertExists,
 } from "https://deno.land/std@0.208.0/assert/mod.ts";
+import {
+  type FloodRiskClient,
+  handleDetermineZoneRequest,
+  type HandlerDependencies,
+} from "../supabase/functions/determine-zone/index.ts";
+import {
+  DISCLAIMER,
+  ERROR_CODES,
+  errorResponse,
+} from "../supabase/functions/determine-zone/errors.ts";
 
 const floodRiskFixture = JSON.parse(
   await Deno.readTextFile(
-    new URL("./fixtures/flood-risk-row.json", import.meta.url)
-  )
+    new URL("./fixtures/flood-risk-row.json", import.meta.url),
+  ),
 );
 
 const censusFixture = JSON.parse(
   await Deno.readTextFile(
-    new URL("./fixtures/census-response.json", import.meta.url)
-  )
+    new URL("./fixtures/census-response.json", import.meta.url),
+  ),
 );
 
-// ---------------------------------------------------------------------------
-// Helper: build a Request to the edge function
-// ---------------------------------------------------------------------------
-function makeRequest(address?: string): Request {
-  const url = address
-    ? `https://functions.supabase.co/determine-zone?address=${encodeURIComponent(address)}`
-    : "https://functions.supabase.co/determine-zone";
-  return new Request(url, { method: "GET" });
+function makeRequest(body: unknown, method = "POST"): Request {
+  return new Request("https://functions.supabase.co/determine-zone", {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: method === "GET" || method === "HEAD" || body === undefined
+      ? undefined
+      : JSON.stringify(body),
+  });
 }
 
-// ---------------------------------------------------------------------------
-// Helper: mock Supabase createClient to return canned flood risk data
-// ---------------------------------------------------------------------------
 function mockSupabaseClient(
   data: unknown,
-  error: unknown = null
-): Record<string, unknown> {
+  error: unknown = null,
+): FloodRiskClient {
   return {
-    rpc: (_fn: string, _params: unknown) =>
-      Promise.resolve({ data, error }),
+    rpc: (
+      _functionName: string,
+      _params: { p_lat: number; p_lng: number },
+    ) => ({
+      returns<T>(): Promise<{ data: T | null; error: unknown }> {
+        return Promise.resolve({ data: data as T, error });
+      },
+    }),
   };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+function mockDeps(
+  overrides: Partial<HandlerDependencies> = {},
+): HandlerDependencies {
+  return {
+    geocodeCensus: (_address: string) =>
+      Promise.resolve({ lat: 30.26715, lng: -97.74309 }),
+    geocodeGoogle: (_address: string, _apiKey: string) =>
+      Promise.resolve({ lat: 30.26715, lng: -97.74309 }),
+    getEnv: (name: string) =>
+      name === "GOOGLE_MAPS_API_KEY" ? "test-google-key" : undefined,
+    createFloodRiskClient: () => mockSupabaseClient([floodRiskFixture]),
+    now: () => new Date("2026-05-11T00:00:00.000Z"),
+    ...overrides,
+  };
+}
 
-Deno.test("Returns 400 when address parameter is missing", async () => {
-  const { errorResponse, ErrorCodes } = await import(
-    "../functions/determine-zone/errors.ts"
-  );
+Deno.test("errorResponse produces correct JSON shape with disclaimer", async () => {
   const response = errorResponse(
+    "address is required",
+    ERROR_CODES.MISSING_ADDRESS,
     400,
-    ErrorCodes.MISSING_ADDRESS,
-    "Query parameter 'address' is required"
   );
   assertEquals(response.status, 400);
   const body = await response.json();
-  assertEquals(body.error.code, "MISSING_ADDRESS");
+  assertEquals(body.error, "address is required");
+  assertEquals(body.code, "MISSING_ADDRESS");
+  assertEquals(body.disclaimer, DISCLAIMER);
 });
 
-Deno.test("errorResponse produces correct JSON shape", async () => {
-  const { errorResponse, ErrorCodes } = await import(
-    "../functions/determine-zone/errors.ts"
+Deno.test("returns 405 when method is not POST", async () => {
+  const response = await handleDetermineZoneRequest(
+    makeRequest({ address: "123 Main St" }, "GET"),
+    mockDeps(),
   );
-  const response = errorResponse(
-    422,
-    ErrorCodes.GEOCODE_FAILED,
-    "Could not geocode the provided address"
-  );
-  assertEquals(response.status, 422);
-  assertEquals(response.headers.get("Content-Type"), "application/json");
+  assertEquals(response.status, 405);
   const body = await response.json();
-  assertExists(body.error);
-  assertEquals(body.error.code, "GEOCODE_FAILED");
-  assertEquals(body.error.message, "Could not geocode the provided address");
+  assertEquals(body.code, "METHOD_NOT_ALLOWED");
+  assertExists(body.disclaimer);
 });
 
-Deno.test("Flood risk response maps DB row to API shape correctly", () => {
-  // Simulate the mapping logic from index.ts
-  const geocoded = {
-    lat: 30.26715,
-    lon: -97.74309,
-    formattedAddress: "123 MAIN ST, AUSTIN, TX, 78701",
-    source: "census" as const,
-  };
+Deno.test("returns 400 when address is missing", async () => {
+  const response = await handleDetermineZoneRequest(
+    makeRequest({}),
+    mockDeps(),
+  );
+  assertEquals(response.status, 400);
+  const body = await response.json();
+  assertEquals(body.code, "MISSING_ADDRESS");
+  assertExists(body.disclaimer);
+});
 
-  const row = floodRiskFixture;
+Deno.test("returns mapped flood-risk response for a valid address", async () => {
+  const response = await handleDetermineZoneRequest(
+    makeRequest({ address: "123 Main St" }),
+    mockDeps(),
+  );
+  assertEquals(response.status, 200);
 
-  const response = {
-    address: geocoded.formattedAddress,
-    coordinates: { lat: geocoded.lat, lon: geocoded.lon },
-    flood_zone: row.fld_zone,
-    zone_subtype: row.zone_subty,
-    special_flood_hazard_area: row.sfha_tf,
-    base_flood_elevation_ft: row.static_bfe,
-    depth_ft: row.depth,
-    effective_date: row.eff_date,
-    firm_panel: row.dfirm_id,
-    geocoder_source: geocoded.source,
-  };
+  const body = await response.json();
+  assertEquals(body.address, "123 Main St");
+  assertEquals(body.coordinates, { lat: 30.26715, lng: -97.74309 });
+  assertEquals(body.geocode_source, "census");
+  assertEquals(body.unmapped, false);
+  assertEquals(body.requested_at, "2026-05-11T00:00:00.000Z");
+  assertEquals(body.disclaimer, DISCLAIMER);
+  assertEquals(body.determination.zone_code, "AE");
+  assertEquals(body.determination.risk_level, "HIGH");
+  assertEquals(body.determination.disclaimer, DISCLAIMER);
+});
 
-  assertEquals(response.flood_zone, "AE");
-  assertEquals(response.special_flood_hazard_area, true);
-  assertEquals(response.base_flood_elevation_ft, 452.0);
-  assertEquals(response.firm_panel, "48453C0350K");
-  assertEquals(response.geocoder_source, "census");
-  assertEquals(response.zone_subtype, null);
-  assertEquals(response.depth_ft, null);
+Deno.test("returns unmapped true when spatial lookup returns no rows", async () => {
+  const response = await handleDetermineZoneRequest(
+    makeRequest({ address: "Point Nemo" }),
+    mockDeps({ createFloodRiskClient: () => mockSupabaseClient([]) }),
+  );
+
+  assertEquals(response.status, 200);
+  const body = await response.json();
+  assertEquals(body.determination, null);
+  assertEquals(body.unmapped, true);
+  assertExists(body.disclaimer);
+});
+
+Deno.test("falls back to Google when Census geocoding fails", async () => {
+  const response = await handleDetermineZoneRequest(
+    makeRequest({ address: "123 Main St" }),
+    mockDeps({ geocodeCensus: (_address: string) => Promise.resolve(null) }),
+  );
+
+  assertEquals(response.status, 200);
+  const body = await response.json();
+  assertEquals(body.geocode_source, "google");
+  assertEquals(body.coordinates, { lat: 30.26715, lng: -97.74309 });
+});
+
+Deno.test("returns 502 when Census fails and Google key is not configured", async () => {
+  const response = await handleDetermineZoneRequest(
+    makeRequest({ address: "123 Main St" }),
+    mockDeps({
+      geocodeCensus: (_address: string) => Promise.resolve(null),
+      getEnv: (_name: string) => undefined,
+    }),
+  );
+
+  assertEquals(response.status, 502);
+  const body = await response.json();
+  assertEquals(body.code, "GEOCODE_NO_FALLBACK");
+  assertExists(body.disclaimer);
+});
+
+Deno.test("returns 500 when spatial lookup fails", async () => {
+  const response = await handleDetermineZoneRequest(
+    makeRequest({ address: "123 Main St" }),
+    mockDeps({
+      createFloodRiskClient: () =>
+        mockSupabaseClient(null, { message: "boom" }),
+    }),
+  );
+
+  assertEquals(response.status, 500);
+  const body = await response.json();
+  assertEquals(body.code, "DB_ERROR");
+  assertExists(body.disclaimer);
 });
 
 Deno.test("Census geocoder fixture has expected structure", () => {
@@ -120,7 +190,8 @@ Deno.test("Census geocoder fixture has expected structure", () => {
 });
 
 Deno.test("Flood risk fixture has expected structure", () => {
-  assertExists(floodRiskFixture.fld_zone);
-  assertEquals(typeof floodRiskFixture.sfha_tf, "boolean");
+  assertExists(floodRiskFixture.zone_code);
+  assertEquals(floodRiskFixture.risk_level, "HIGH");
   assertExists(floodRiskFixture.dfirm_id);
+  assertExists(floodRiskFixture.disclaimer);
 });

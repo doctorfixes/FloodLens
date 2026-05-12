@@ -1,111 +1,49 @@
 """
-fema_client.py — FEMA REST API wrapper
+fema_client.py
 
-Provides methods for querying the FEMA National Flood Hazard Layer (NFHL)
-REST service to identify new or updated FIRM panels since the last refresh.
+Thin wrapper around FEMA's NFHL ArcGIS REST service.
+Used by the DAG to compare effective dates before triggering ingestion.
 """
 
 from __future__ import annotations
-
 import logging
-from datetime import date
-from typing import Any
+from datetime import datetime
 
 import requests
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-NFHL_REST_BASE = (
-    "https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer"
-)
-
-# Layer 28: S_FLD_HAZ_AR (Flood Hazard Areas)
-FLOOD_ZONE_LAYER = 28
-
-# Default page size for paginated requests
-DEFAULT_PAGE_SIZE = 1000
+NFHL_MAP_SERVER = "https://hazards.fema.gov/nfhl/rest/services/public/NFHL/MapServer"
+FLOOD_HAZARD_LAYER_ID = 28
+REQUEST_TIMEOUT = 30
 
 
-class FemaClient:
-    """Thin wrapper around the FEMA NFHL ArcGIS REST service."""
+def get_latest_eff_date(state_fips: str) -> str | None:
+    """
+    Returns the most recent panel effective date for a state from FEMA's
+    NFHL REST service as an ISO date string, or None on failure.
 
-    def __init__(self, base_url: str = NFHL_REST_BASE, timeout: int = 30) -> None:
-        self.base_url = base_url
-        self.timeout = timeout
-        self.session = requests.Session()
-        self.session.headers.update({"Accept": "application/json"})
+    FEMA returns timestamps as epoch milliseconds.
+    """
+    url = f"{NFHL_MAP_SERVER}/{FLOOD_HAZARD_LAYER_ID}/query"
+    params = {
+        "where": f"STATE_FIPS='{state_fips}'",
+        "outFields": "EFF_DATE",
+        "returnGeometry": "false",
+        "orderByFields": "EFF_DATE DESC",
+        "resultRecordCount": 1,
+        "f": "json",
+    }
 
-    def _query(
-        self,
-        layer: int,
-        where: str = "1=1",
-        out_fields: str = "*",
-        result_offset: int = 0,
-        result_record_count: int = DEFAULT_PAGE_SIZE,
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        """Execute a query against a specific NFHL layer."""
-        url = f"{self.base_url}/{layer}/query"
-        params: dict[str, Any] = {
-            "where": where,
-            "outFields": out_fields,
-            "f": "json",
-            "resultOffset": result_offset,
-            "resultRecordCount": result_record_count,
-            **kwargs,
-        }
-        resp = self.session.get(url, params=params, timeout=self.timeout)
-        resp.raise_for_status()
-        data = resp.json()
-        if "error" in data:
-            raise RuntimeError(
-                f"FEMA API error: {data['error'].get('message', data['error'])}"
-            )
-        return data
-
-    def get_updated_panels(self, since: date) -> list[dict[str, Any]]:
-        """
-        Return FIRM panel records whose EFF_DATE is strictly after `since`.
-
-        Parameters
-        ----------
-        since:
-            Only panels with an effective date after this value are returned.
-
-        Returns
-        -------
-        list[dict]
-            Each dict contains at minimum ``DFIRM_ID`` and ``EFF_DATE``.
-        """
-        where = f"EFF_DATE > DATE '{since.isoformat()}'"
-        records: list[dict[str, Any]] = []
-        offset = 0
-
-        while True:
-            page = self._query(
-                layer=FLOOD_ZONE_LAYER,
-                where=where,
-                out_fields="DFIRM_ID,EFF_DATE",
-                result_offset=offset,
-                result_record_count=DEFAULT_PAGE_SIZE,
-            )
-            features: list[dict[str, Any]] = page.get("features", [])
-            records.extend(f["attributes"] for f in features)
-
-            if len(features) < DEFAULT_PAGE_SIZE:
-                break
-            offset += DEFAULT_PAGE_SIZE
-
-        logger.info(
-            "Found %d updated FIRM panels since %s", len(records), since.isoformat()
-        )
-        return records
-
-    def close(self) -> None:
-        self.session.close()
-
-    def __enter__(self) -> "FemaClient":
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.close()
+    try:
+        res = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+        res.raise_for_status()
+        features = res.json().get("features", [])
+        if not features:
+            log.warning("No FEMA features returned for state %s", state_fips)
+            return None
+        raw_ts = features[0]["attributes"]["EFF_DATE"]
+        return datetime.utcfromtimestamp(raw_ts / 1000).strftime("%Y-%m-%d")
+    except Exception as exc:
+        log.warning("FEMA eff_date fetch failed for state %s: %s", state_fips, exc)
+        return None

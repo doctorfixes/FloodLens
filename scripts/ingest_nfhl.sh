@@ -1,55 +1,68 @@
 #!/usr/bin/env bash
-# ingest_nfhl.sh — ogr2ogr ingestion script for FEMA NFHL shapefiles
-# Loads flood zone polygons from a state NFHL shapefile into PostGIS.
 #
-# Usage: ./ingest_nfhl.sh <STATE_FIPS>
-# Example: ./ingest_nfhl.sh 06   # California
+# ingest_nfhl.sh
 #
-# Required environment variables:
-#   DATABASE_URL  PostgreSQL connection string (postgres://user:pass@host:port/db)
+# Ingests a single FEMA NFHL state shapefile into the flood_zones table.
+# Appends rows. Never truncates. Safe to run multiple times on the same state.
 #
-# Optional environment variables:
-#   DATA_DIR      Base directory for shapefiles (default: data)
-#   NFHL_LAYER    OGR layer name to import (default: S_FLD_HAZ_AR)
+# Usage:   ./scripts/ingest_nfhl.sh <shapefile.shp> <STATE_FIPS>
+# Example: ./scripts/ingest_nfhl.sh ./data/S_FLD_HAZ_AR_12.shp 12
+#
+# Required env:   SUPABASE_DB_URL - full postgres:// connection string
+# Required tools: ogr2ogr (GDAL >= 3.4), psql
 
 set -euo pipefail
 
-STATE_FIPS="${1:?Usage: $0 <STATE_FIPS>}"
-DATABASE_URL="${DATABASE_URL:?DATABASE_URL environment variable is required}"
-DATA_DIR="${DATA_DIR:-data}"
-NFHL_LAYER="${NFHL_LAYER:-S_FLD_HAZ_AR}"
+SHP_FILE="${1:?Arg 1 required: path to .shp file}"
+STATE_FIPS="${2:?Arg 2 required: two-digit state FIPS code}"
+LOG_DIR="./logs"
+LOG_FILE="${LOG_DIR}/ingest_$(date +%Y%m%d_%H%M%S)_state${STATE_FIPS}.log"
+DB_URL="${SUPABASE_DB_URL:?SUPABASE_DB_URL environment variable is not set}"
 
-# Zero-pad to 2 digits
-STATE_FIPS=$(printf "%02d" "${STATE_FIPS#0}")
+mkdir -p "${LOG_DIR}"
 
-SHP_DIR="${DATA_DIR}/${STATE_FIPS}"
+log() {
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "${LOG_FILE}"
+}
 
-if [ ! -d "${SHP_DIR}" ]; then
-  echo "[ingest_nfhl] ERROR: Shapefile directory '${SHP_DIR}' not found." >&2
-  echo "[ingest_nfhl] Run download_nfhl.sh ${STATE_FIPS} first." >&2
-  exit 1
-fi
+log "START - State FIPS: ${STATE_FIPS}"
+log "Source file: ${SHP_FILE}"
 
-# Find the flood hazard area shapefile
-SHP_FILE=$(find "${SHP_DIR}" -iname "${NFHL_LAYER}.shp" | head -n 1)
+# Log detected source SRS for audit trail.
+DETECTED_SRS=$(ogrinfo -al -so "${SHP_FILE}" 2>/dev/null \
+  | grep -i "Proj" | head -1 || echo "NOT DETECTED")
+log "Detected source projection: ${DETECTED_SRS}"
 
-if [ -z "${SHP_FILE}" ]; then
-  echo "[ingest_nfhl] ERROR: Could not find ${NFHL_LAYER}.shp in ${SHP_DIR}" >&2
-  exit 1
-fi
-
-echo "[ingest_nfhl] Ingesting ${SHP_FILE} into flood_zones table..."
+# Count source features before ingestion.
+SRC_COUNT=$(ogrinfo -al -so "${SHP_FILE}" 2>/dev/null \
+  | grep "Feature Count" | awk '{print $3}' || echo "UNKNOWN")
+log "Source feature count: ${SRC_COUNT}"
 
 ogr2ogr \
   -f "PostgreSQL" \
-  PG:"${DATABASE_URL}" \
+  PG:"${DB_URL}" \
   "${SHP_FILE}" \
-  -nln flood_zones \
-  -nlt MULTIPOLYGON \
+  \
   -t_srs EPSG:4326 \
-  -lco GEOMETRY_NAME=geom \
-  -lco FID=id \
+  \
+  -nlt PROMOTE_TO_MULTI \
+  \
+  -nln public.flood_zones \
+  \
   -append \
-  -progress
+  \
+  -sql "SELECT *, '${STATE_FIPS}' AS state_fips FROM $(basename "${SHP_FILE}" .shp)" \
+  \
+  --config PG_USE_COPY YES \
+  \
+  -skipfailures \
+  \
+  2>&1 | tee -a "${LOG_FILE}"
 
-echo "[ingest_nfhl] Ingest complete for state FIPS ${STATE_FIPS}."
+# Count rows in DB for this state after ingestion.
+POST_COUNT=$(psql "${DB_URL}" -t -c \
+  "SELECT COUNT(*) FROM public.flood_zones WHERE state_fips = '${STATE_FIPS}';" \
+  2>/dev/null | tr -d ' ' || echo "QUERY FAILED")
+
+log "Rows in DB for state ${STATE_FIPS} after ingestion: ${POST_COUNT}"
+log "END"

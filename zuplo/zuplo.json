@@ -1,50 +1,27 @@
 {
-  "version": "3",
   "routes": [
     {
       "path": "/v1/determine-zone",
-      "methods": ["GET"],
-      "handler": "url-forward",
-      "options": {
-        "forwardTo": "https://${env.SUPABASE_PROJECT_ID}.supabase.co/functions/v1/determine-zone"
+      "method": "POST",
+      "label": "Flood Zone Determination",
+      "handler": {
+        "module": "$import(@zuplo/runtime)",
+        "export": "urlRewriteHandler",
+        "options": {
+          "rewritePattern": "${env.SUPABASE_FUNCTION_URL}/determine-zone",
+          "forwardSearch": false
+        }
       },
       "policies": {
         "inbound": [
-          "api-key-auth",
-          "rate-limit-by-plan"
+          "api-key-inbound",
+          "rate-limit-inbound",
+          "request-validation-inbound"
         ],
         "outbound": [
-          "stripe-metered-billing"
+          "stripe-metered-billing-outbound"
         ]
       }
     }
-  ],
-  "policies": [
-    {
-      "name": "api-key-auth",
-      "policyType": "api-key-inbound"
-    },
-    {
-      "name": "rate-limit-by-plan",
-      "policyType": "custom-code-inbound",
-      "options": {
-        "scriptPath": "./policies/rate-limit-by-plan.ts"
-      }
-    },
-    {
-      "name": "stripe-metered-billing",
-      "policyType": "custom-code-outbound",
-      "options": {
-        "scriptPath": "./policies/stripe-metered-billing.ts"
-      }
-    }
-  ],
-  "environments": {
-    "production": {
-      "name": "Production"
-    },
-    "staging": {
-      "name": "Staging"
-    }
-  }
+  ]
 }

@@ -1,38 +1,30 @@
 #!/usr/bin/env bash
-# download_nfhl.sh — FEMA MSC download helper
-# Downloads the NFHL shapefile archive for a given state FIPS code.
 #
-# Usage: ./download_nfhl.sh <STATE_FIPS>
-# Example: ./download_nfhl.sh 06   # California
+# download_nfhl.sh
 #
-# Requires: curl, unzip
-# Output: data/<STATE_FIPS>/  (extracted shapefiles)
+# FEMA MSC download wrapper for a single state NFHL archive.
+#
+# Usage:   ./scripts/download_nfhl.sh <STATE_FIPS>
+# Example: ./scripts/download_nfhl.sh 12
+#
+# Output: data/state_<STATE_FIPS>/
 
 set -euo pipefail
 
-STATE_FIPS="${1:?Usage: $0 <STATE_FIPS>}"
+STATE_FIPS="${1:?Arg 1 required: two-digit state FIPS code}"
 DATA_DIR="${DATA_DIR:-data}"
-# Allow overriding the NFHL dataset date via environment variable.
-# Visit https://hazards.fema.gov/nfhl to find the latest available date.
-NFHL_DATE="${NFHL_DATE:-20231001}"
-
-# Zero-pad to 2 digits
-STATE_FIPS=$(printf "%02d" "${STATE_FIPS#0}")
-
-DOWNLOAD_URL="https://hazards.fema.gov/NFHL/${STATE_FIPS}/NFHL_${STATE_FIPS}_${NFHL_DATE}.zip"
-DEST_DIR="${DATA_DIR}/${STATE_FIPS}"
+DEST_DIR="${DATA_DIR}/state_${STATE_FIPS}"
 ZIP_FILE="${DEST_DIR}/NFHL_${STATE_FIPS}.zip"
+DOWNLOAD_URL="https://msc.fema.gov/portal/downloadProduct?productTypeID=NFHL&productSubTypeID=State&productVersionID=${STATE_FIPS}"
 
-echo "[download_nfhl] Downloading NFHL for state FIPS ${STATE_FIPS}..."
 mkdir -p "${DEST_DIR}"
 
-curl --fail --silent --show-error \
-     --retry 3 --retry-delay 5 \
-     --location \
-     --output "${ZIP_FILE}" \
-     "${DOWNLOAD_URL}"
+echo "[download_nfhl] Downloading NFHL state ${STATE_FIPS}"
+curl --fail --silent --show-error --location --retry 3 --retry-delay 5 \
+  --output "${ZIP_FILE}" \
+  "${DOWNLOAD_URL}"
 
-echo "[download_nfhl] Extracting to ${DEST_DIR}..."
+echo "[download_nfhl] Extracting ${ZIP_FILE}"
 unzip -q -o "${ZIP_FILE}" -d "${DEST_DIR}"
 rm "${ZIP_FILE}"
 

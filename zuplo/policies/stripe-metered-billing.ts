@@ -1,64 +1,40 @@
 import { ZuploContext, ZuploRequest } from "@zuplo/runtime";
 
-/**
- * stripe-metered-billing.ts
- * Outbound policy: records a metered billing event in Stripe for every
- * successful API response (2xx). Skips billing for error responses.
- */
-
-const STRIPE_API_URL = "https://api.stripe.com/v1";
+// Fires on every outbound response.
+// Bills one unit to Stripe only on successful 200 OK determinations.
+// All tier and customer logic belongs here - never in the Edge Function.
 
 export default async function policy(
   response: Response,
   request: ZuploRequest,
-  context: ZuploContext
+  context: ZuploContext,
 ): Promise<Response> {
-  // Only bill on successful responses
-  if (!response.ok) {
-    return response;
-  }
+  if (response.status !== 200) return response;
 
-  const stripeApiKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeApiKey) {
-    context.log.warn("STRIPE_SECRET_KEY not set; skipping metered billing");
-    return response;
-  }
+  const stripeKey = context.environment.STRIPE_SECRET_KEY;
+  const customerId = request.user?.data?.stripeCustomerId as string | undefined;
 
-  // Retrieve the Stripe subscription item ID attached to the consumer
-  const subscriptionItemId = request.user?.data?.stripeSubscriptionItemId as
-    | string
-    | undefined;
-
-  if (!subscriptionItemId) {
-    context.log.warn("No stripeSubscriptionItemId on consumer; skipping billing");
-    return response;
-  }
+  // Free-tier keys without a Stripe customer ID are not billed.
+  // Free-tier enforcement is handled by the rate-limit-free policy.
+  if (!customerId || !stripeKey) return response;
 
   try {
-    const body = new URLSearchParams({
-      quantity: "1",
-      action: "increment",
-      timestamp: String(Math.floor(Date.now() / 1000)),
+    await fetch("https://api.stripe.com/v1/billing/meter_events", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${stripeKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        event_name: "flood_zone_determination",
+        "payload[stripe_customer_id]": customerId,
+        "payload[value]": "1",
+      }),
     });
-
-    const billingRes = await fetch(
-      `${STRIPE_API_URL}/subscription_items/${subscriptionItemId}/usage_records`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${stripeApiKey}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body,
-      }
-    );
-
-    if (!billingRes.ok) {
-      const err = await billingRes.text();
-      context.log.error("Stripe billing error", { status: billingRes.status, err });
-    }
   } catch (err) {
-    context.log.error("Stripe billing exception", { err });
+    // Log billing failures without blocking the response.
+    // A failed billing event should not degrade the API caller's experience.
+    context.log.error("Stripe meter event failed", { error: err, customerId });
   }
 
   return response;

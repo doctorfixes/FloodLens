@@ -1,6 +1,10 @@
--- no-transaction
--- Create spatial index on flood_zones geometry column
--- Must run outside a transaction block because CREATE INDEX CONCURRENTLY
--- cannot run inside a transaction.
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_flood_zones_geom
-    ON flood_zones USING GIST (geom);
+-- supabase no transaction
+--
+-- CONCURRENTLY cannot run inside a transaction block.
+-- The "supabase no transaction" directive tells the Supabase CLI
+-- to execute this file outside a transaction wrapper.
+-- Without this directive the migration will fail at runtime.
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_flood_zones_geometry
+  ON public.flood_zones
+  USING GIST (geometry);

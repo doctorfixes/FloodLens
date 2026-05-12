@@ -1,82 +1,42 @@
 # Getting Started
 
-## Overview
+FloodLens converts a US address into a structured FEMA flood zone determination.
 
-FloodLens is a serverless API that converts any US address into a structured FEMA flood zone determination. This guide walks you through getting your API key and making your first request.
+## 1. Get an API Key
 
----
+Create an API key in your FloodLens dashboard. API keys are managed by Zuplo and
+carry tier metadata for rate limiting and Stripe metering.
 
-## 1. Sign Up and Get Your API Key
-
-1. Visit [floodlens.io](https://floodlens.io) and create an account.
-2. Navigate to **API Keys** in your dashboard.
-3. Click **Create Key** and copy your key — it starts with `fl_live_`.
-
-> **Keep your key secret.** Do not commit it to source control.
-
----
-
-## 2. Make Your First API Call
-
-Replace `<YOUR_API_KEY>` with your actual key and `<ADDRESS>` with any US address:
+## 2. Make Your First Request
 
 ```bash
-curl -G "https://api.floodlens.io/v1/determine-zone" \
-  --data-urlencode "address=123 Main St, Austin TX 78701" \
-  -H "Authorization: Bearer <YOUR_API_KEY>"
+curl -X POST "https://YOUR_ZUPLO_GATEWAY/v1/determine-zone" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"address": "123 Main St, Miami, FL 33101"}'
 ```
 
-### Example Response
+## 3. Read the Result
 
-```json
-{
-  "address": "123 MAIN ST, AUSTIN, TX 78701",
-  "coordinates": {
-    "lat": 30.2672,
-    "lon": -97.7431
-  },
-  "flood_zone": "AE",
-  "zone_subtype": null,
-  "special_flood_hazard_area": true,
-  "base_flood_elevation_ft": 452.0,
-  "depth_ft": null,
-  "effective_date": "2010-03-01",
-  "firm_panel": "48453C0350K",
-  "geocoder_source": "census"
-}
-```
+The main response fields are:
 
----
-
-## 3. Interpret the Result
-
-The two most important fields are:
-
-- **`flood_zone`** — The FEMA designation. See [Zone Codes](zone-codes.md) for a full reference.
-- **`special_flood_hazard_area`** — If `true`, federal mortgage lenders typically require flood insurance.
-
----
+- `coordinates`: WGS 84 latitude and longitude used for the lookup.
+- `geocode_source`: `census` or `google`.
+- `determination.zone_code`: FEMA zone code such as `AE`, `VE`, `X`, or `D`.
+- `determination.risk_level`: `HIGH`, `MODERATE`, `MINIMAL`, `UNDETERMINED`, or `UNKNOWN`.
+- `unmapped`: `true` when no ingested polygon covers the coordinate.
+- `disclaimer`: present on every success and error response.
 
 ## 4. Handle Errors
 
-Check the HTTP status code. Errors return a JSON body with `error.code` and `error.message`. See [API Reference](api-reference.md#error-codes) for the complete list.
+Errors use this shape:
 
----
+```json
+{
+  "error": "address is required",
+  "code": "MISSING_ADDRESS",
+  "disclaimer": "This result is derived from FEMA National Flood Hazard Layer (NFHL) data..."
+}
+```
 
-## 5. Rate Limits
-
-| Plan      | Limit               |
-|-----------|---------------------|
-| Free      | 50 requests / month |
-| Developer | 60 requests / minute|
-| Pro       | 300 requests / minute|
-
-Upgrade your plan in the dashboard at any time.
-
----
-
-## Next Steps
-
-- Read the full [API Reference](api-reference.md)
-- Understand [Data Sources](data-sources.md) and coverage gaps
-- Browse [Zone Codes](zone-codes.md) for plain-language explanations
+See [API Reference](api-reference.md) for all error codes and response fields.
