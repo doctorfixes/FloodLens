@@ -1,87 +1,34 @@
 """
-db_client.py — Postgres connection and eff_date queries
+db_client.py
 
-Provides a thin helper class for connecting to the FloodLens Postgres
-database and querying the latest effective date for a FIRM panel.
+Postgres utilities for the NFHL refresh DAG.
+Handles eff_date comparison queries against the flood_zones table.
 """
 
 from __future__ import annotations
-
 import logging
-import os
-from contextlib import contextmanager
-from datetime import date
-from typing import Generator
 
 import psycopg2
-import psycopg2.extras
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
-class DbClient:
-    """Manages a Postgres connection and provides eff_date helpers."""
-
-    def __init__(self, dsn: str | None = None) -> None:
-        self.dsn = dsn or os.environ["DATABASE_URL"]
-        self._conn: psycopg2.extensions.connection | None = None
-
-    def connect(self) -> None:
-        if self._conn is None or self._conn.closed:
-            self._conn = psycopg2.connect(
-                self.dsn,
-                cursor_factory=psycopg2.extras.RealDictCursor,
-            )
-            logger.debug("Connected to Postgres")
-
-    def close(self) -> None:
-        if self._conn and not self._conn.closed:
-            self._conn.close()
-            logger.debug("Postgres connection closed")
-
-    @contextmanager
-    def cursor(self) -> Generator[psycopg2.extras.RealDictCursor, None, None]:
-        self.connect()
-        assert self._conn is not None
-        with self._conn.cursor() as cur:
-            yield cur
-        self._conn.commit()
-
-    def get_latest_eff_date(self, dfirm_id: str) -> date | None:
-        """
-        Return the latest effective date stored for the given FIRM panel ID,
-        or None if no records exist yet.
-
-        Parameters
-        ----------
-        dfirm_id:
-            The DFIRM panel identifier (e.g. ``"48201C0095J"``).
-        """
-        sql = """
-            SELECT MAX(eff_date) AS latest
-            FROM flood_zones
-            WHERE dfirm_id = %(dfirm_id)s
-        """
-        with self.cursor() as cur:
-            cur.execute(sql, {"dfirm_id": dfirm_id})
-            row = cur.fetchone()
-
-        if row is None:
-            return None
-        return row["latest"]
-
-    def get_max_eff_date(self) -> date | None:
-        """Return the overall maximum effective date across all flood zones."""
-        with self.cursor() as cur:
-            cur.execute("SELECT MAX(eff_date) AS latest FROM flood_zones")
-            row = cur.fetchone()
-        if row is None:
-            return None
-        return row["latest"]
-
-    def __enter__(self) -> "DbClient":
-        self.connect()
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        self.close()
+def get_current_eff_date(state_fips: str, db_url: str) -> str | None:
+    """
+    Returns the most recent eff_date stored in flood_zones for the given
+    state as an ISO date string, or None if the state has no rows.
+    """
+    try:
+        conn = psycopg2.connect(db_url)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT MAX(eff_date) FROM public.flood_zones WHERE state_fips = %s",
+            (state_fips,),
+        )
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result[0].isoformat() if result and result[0] else None
+    except Exception as exc:
+        log.warning("DB eff_date query failed for state %s: %s", state_fips, exc)
+        return None

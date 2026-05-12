@@ -1,24 +1,27 @@
-# ── Runtime / local NFHL shapefiles ──────────────────────────────────────────
-data/
 logs/
-
-# ── Environment / secrets ─────────────────────────────────────────────────────
+data/
 .env
+*.shp
+*.dbf
+*.prj
+*.shx
+*.cpg
+
 .env.local
 .env.*.local
 
-# ── Supabase ──────────────────────────────────────────────────────────────────
+# Supabase
 supabase/.branches/
 supabase/.temp/
 supabase/gcloud.json
 
-# ── Node / Deno ───────────────────────────────────────────────────────────────
+# Node / Deno
 node_modules/
 .deno/
 dist/
 *.js.map
 
-# ── Python ────────────────────────────────────────────────────────────────────
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -26,7 +29,7 @@ __pycache__/
 venv/
 .pytest_cache/
 
-# ── macOS / editor ────────────────────────────────────────────────────────────
+# macOS / editor
 .DS_Store
 .idea/
 .vscode/

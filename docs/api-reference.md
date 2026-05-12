@@ -2,108 +2,82 @@
 
 ## Endpoint
 
-```
-GET /v1/determine-zone
-```
-
-Returns the FEMA flood zone determination for a US address.
-
----
-
-## Request
-
-### Query Parameters
-
-| Parameter | Type   | Required | Description                              |
-|-----------|--------|----------|------------------------------------------|
-| `address` | string | Yes      | Full US street address (URL-encoded)     |
-
-### Authentication
-
-All requests must include an API key in the `Authorization` header:
-
-```
-Authorization: Bearer <YOUR_API_KEY>
+```http
+POST /v1/determine-zone
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
 ```
 
-### Example Request
+Returns a FEMA flood zone determination for a US street address.
 
-```bash
-curl -G "https://api.floodlens.io/v1/determine-zone" \
-  --data-urlencode "address=1600 Pennsylvania Ave NW, Washington DC 20500" \
-  -H "Authorization: Bearer fl_live_xxxxxxxxxxxx"
-```
-
----
-
-## Response
-
-### 200 OK
+## Request Body
 
 ```json
 {
-  "address": "1600 PENNSYLVANIA AVE NW, WASHINGTON, DC 20500",
-  "coordinates": {
-    "lat": 38.8977,
-    "lon": -77.0366
+  "address": "1600 Pennsylvania Avenue NW, Washington, DC 20500"
+}
+```
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `address` | string | Yes | Full US address to geocode and evaluate. |
+
+## 200 Response
+
+```json
+{
+  "address": "1600 Pennsylvania Avenue NW, Washington, DC 20500",
+  "coordinates": { "lat": 38.8977, "lng": -77.0366 },
+  "geocode_source": "census",
+  "determination": {
+    "zone_code": "X",
+    "zone_label": "Minimal Flood Hazard Area",
+    "risk_level": "MINIMAL",
+    "insurance_note": "Minimal Risk. Outside the 500-Year floodplain. Flood insurance is optional.",
+    "bfe": null,
+    "depth": null,
+    "panel_number": "11001C0097",
+    "dfirm_id": "11001C",
+    "eff_date": "2010-09-27",
+    "disclaimer": "This result is derived from FEMA National Flood Hazard Layer (NFHL) data..."
   },
-  "flood_zone": "X",
-  "zone_subtype": "AREA OF MINIMAL FLOOD HAZARD",
-  "special_flood_hazard_area": false,
-  "base_flood_elevation_ft": null,
-  "depth_ft": null,
-  "effective_date": "2010-09-27",
-  "firm_panel": "11001C0071E",
-  "geocoder_source": "census"
+  "unmapped": false,
+  "requested_at": "2026-05-11T00:00:00.000Z",
+  "disclaimer": "This result is derived from FEMA National Flood Hazard Layer (NFHL) data..."
 }
 ```
 
-### Response Fields
+If the coordinate is outside all ingested polygons, `determination` is `null`
+and `unmapped` is `true`. The top-level `disclaimer` is still present.
 
-| Field                       | Type            | Description                                               |
-|-----------------------------|-----------------|-----------------------------------------------------------|
-| `address`                   | string          | Standardized address returned by the geocoder             |
-| `coordinates.lat`           | number          | Latitude (WGS84)                                          |
-| `coordinates.lon`           | number          | Longitude (WGS84)                                         |
-| `flood_zone`                | string          | FEMA flood zone designation (e.g., `AE`, `X`, `VE`)      |
-| `zone_subtype`              | string \| null  | Additional zone classification detail                     |
-| `special_flood_hazard_area` | boolean         | Whether the location is in a SFHA (mandatory insurance)   |
-| `base_flood_elevation_ft`   | number \| null  | Base flood elevation in feet above datum (if applicable)  |
-| `depth_ft`                  | number \| null  | Flood depth in feet (Zone AO/AH only)                     |
-| `effective_date`            | string \| null  | FIRM panel effective date (`YYYY-MM-DD`)                  |
-| `firm_panel`                | string          | FIRM panel identifier                                     |
-| `geocoder_source`           | `census`/`google` | Which geocoder was used to resolve the address          |
+## Error Response
 
----
-
-## Error Responses
-
-All errors follow a consistent shape:
+Every error response includes a disclaimer.
 
 ```json
 {
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable description"
-  }
+  "error": "address is required",
+  "code": "MISSING_ADDRESS",
+  "disclaimer": "This result is derived from FEMA National Flood Hazard Layer (NFHL) data..."
 }
 ```
 
-### Error Codes
+| Status | Code | Meaning |
+| --- | --- | --- |
+| 400 | `INVALID_BODY` | Request body is not valid JSON. |
+| 400 | `MISSING_ADDRESS` | `address` is absent or blank. |
+| 405 | `METHOD_NOT_ALLOWED` | Only `POST` is supported. |
+| 422 | `GEOCODE_FAILURE` | Census and Google could not geocode the address. |
+| 502 | `GEOCODE_NO_FALLBACK` | Census failed and no Google fallback key is configured. |
+| 500 | `DB_ERROR` | PostGIS flood-risk lookup failed. |
 
-| HTTP Status | Code               | Description                                        |
-|-------------|--------------------|----------------------------------------------------|
-| 400         | `MISSING_ADDRESS`  | The `address` query parameter was not provided     |
-| 422         | `GEOCODE_FAILED`   | The address could not be geocoded                  |
-| 404         | `NO_FLOOD_DATA`    | No NFHL data available for this location           |
-| 500         | `INTERNAL_ERROR`   | Unexpected server-side error                       |
+## Rate Limits and Billing
 
----
+Rate limits, API keys, tiers, and Stripe metering are enforced in Zuplo. The
+Supabase Edge Function has no billing or tier awareness.
 
-## Rate Limits
-
-| Plan        | Limit              |
-|-------------|-------------------|
-| Free        | 50 requests/month  |
-| Developer   | 60 requests/minute |
-| Pro         | 300 requests/minute|
+| Tier | Included | Overage | Rate Limit |
+| --- | --- | --- | --- |
+| Free | 50 req/month | None - hard block | 10 req/min |
+| Developer | None | $0.50 / request | 60 req/min |
+| Pro | None | $1.50 / request | 300 req/min |

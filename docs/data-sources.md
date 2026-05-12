@@ -41,7 +41,7 @@ The NFHL is comprehensive but has known limitations:
 
 | Gap | Details |
 |-----|---------|
-| **Un-mapped areas** | Some rural areas and tribal lands have not been studied or mapped. The API returns `404 NO_FLOOD_DATA` for these locations. |
+| **Unmapped areas** | Some rural areas and tribal lands have not been studied or mapped. The API returns `unmapped: true` and `determination: null` for these locations. |
 | **Outdated panels** | Some FIRM panels have not been restudied in decades. The `effective_date` field in responses shows when the panel was last updated. |
 | **Territories** | Coverage for US territories (Puerto Rico, US Virgin Islands, Guam, etc.) is partial. |
 | **Coastal erosion** | The NFHL does not model long-term coastal erosion. Zone boundaries represent conditions at the effective date only. |
@@ -53,7 +53,7 @@ The NFHL is comprehensive but has known limitations:
 
 Addresses are resolved to coordinates using a two-tier approach:
 
-1. **US Census Geocoder** (primary): https://geocoding.geo.census.gov/ — Free, no API key required, covers all US addresses.
+1. **US Census Geocoder** (primary): https://geocoding.geo.census.gov/ - Free, no API key required, covers all US addresses.
 2. **Google Maps Geocoding API** (fallback): Used when the Census geocoder returns no results. Requires a valid `GOOGLE_MAPS_API_KEY`.
 
 ---

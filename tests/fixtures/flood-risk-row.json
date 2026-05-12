@@ -1,9 +1,12 @@
 {
-  "fld_zone": "AE",
-  "zone_subty": null,
-  "sfha_tf": true,
-  "static_bfe": 452.0,
+  "zone_code": "AE",
+  "zone_label": "Special Flood Hazard Area (SFHA)",
+  "risk_level": "HIGH",
+  "insurance_note": "High Risk. Flood insurance REQUIRED for federally backed mortgages. Mandatory purchase requirement applies.",
+  "bfe": 452.0,
   "depth": null,
+  "panel_number": "48453C0350K",
+  "dfirm_id": "48453C",
   "eff_date": "2010-03-01",
-  "dfirm_id": "48453C0350K"
+  "disclaimer": "This result is derived from FEMA National Flood Hazard Layer (NFHL) data and is provided for informational purposes only. It does not constitute an official flood zone determination, a Letter of Map Amendment (LOMA), or legal advice. Official determinations must be obtained through a licensed flood determination company or FEMA directly. Data currency depends on NFHL update cadence and may not reflect the most recent map revisions."
 }
