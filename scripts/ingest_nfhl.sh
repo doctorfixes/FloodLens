@@ -112,7 +112,7 @@ SELECT
   dfirm_id,
   NULL::text AS panel_number,
   fld_zone AS m_zone_code,
-  NULL::numeric(8,2) AS bfe,
+  NULLIF(static_bfe, -9999)::numeric(8,2) AS bfe,
   NULLIF(static_bfe, -9999)::numeric(8,2) AS static_bfe,
   NULLIF(depth, -9999)::numeric(8,2) AS depth,
   NULLIF(velocity, -9999)::numeric(8,2) AS velocity,
