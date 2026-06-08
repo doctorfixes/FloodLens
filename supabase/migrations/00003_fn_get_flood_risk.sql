@@ -1,3 +1,18 @@
+-- Add columns that may be missing from a table created outside the migration system.
+ALTER TABLE public.flood_zones
+  ADD COLUMN IF NOT EXISTS source_feature_id TEXT,
+  ADD COLUMN IF NOT EXISTS zone_subtype    TEXT;
+
+-- Index for feature-level lookup and dedup.
+CREATE INDEX IF NOT EXISTS idx_flood_zones_source_feature_id
+  ON public.flood_zones (source_feature_id);
+
+-- UNIQUE constraint for idempotent ingestion: one feature per state + panel.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_flood_zones_unique_source_feature
+  ON public.flood_zones (state_fips, source_feature_id, eff_date)
+  NULLS NOT DISTINCT
+  WHERE source_feature_id IS NOT NULL;
+
 CREATE OR REPLACE FUNCTION public.fn_get_flood_risk(
   p_lat DOUBLE PRECISION,
   p_lng DOUBLE PRECISION
