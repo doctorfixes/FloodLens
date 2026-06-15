@@ -1,50 +1,57 @@
-# FloodLens
+# ZoneCheck (formerly FloodLens)
 
-FloodLens is a serverless API that converts any US address into a FEMA flood
-zone determination delivered as structured JSON.
+ZoneCheck is a serverless API that converts any US address into a **unified property risk profile** — combining FEMA flood zone determination with neighborhood-level risk scoring (NTS, TCS, VGD).
+
+**One POST, two answers:** flood risk from NFHL data + neighbourhood risk from Verixio's Denver parcel-intelligence engine.
 
 ## Stack
 
-- Supabase Postgres 15 + PostGIS for NFHL spatial data.
-- Supabase Edge Functions (Deno/TypeScript) for geocoding and lookup.
-- Zuplo for API keys, rate limits, request validation, and Stripe metered billing.
-- Apache Airflow for quarterly FEMA NFHL delta refreshes.
+- Supabase Postgres 17 + PostGIS for NFHL spatial data.
+- Supabase Edge Functions (Deno/TypeScript) for geocoding, flood lookup, and Verixio bridge.
+- Verixio Rating Engine — Denver parcel intelligence via `by-coordinates` API.
+- Zuplo for API keys, rate limits, request validation, and Stripe metered billing (planned).
+- Apache Airflow for quarterly FEMA NFHL delta refreshes (planned).
 - GDAL `ogr2ogr` for shapefile ingestion.
 
 ## API
 
 ```bash
-curl -X POST "https://YOUR_ZUPLO_GATEWAY/v1/determine-zone" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+curl -X POST "https://YOUR_SUPABASE_PROJECT.supabase.co/functions/v1/zonecheck" \
+  -H "Authorization: Bearer YOUR_ANON_KEY" \
   -H "Content-Type: application/json" \
   -d '{"address": "123 Main St, Miami, FL 33101"}'
 ```
+
+Response includes:
+- `determination` — FEMA flood zone data (zone code, risk level, BFE, insurance note)
+- `neighborhood` — Verixio neighborhood scores (NTS, TCS, VGD) when available
 
 Every response, including errors, includes a FEMA NFHL disclaimer.
 
 ## Repository Layout
 
-- `supabase/migrations/` - PostGIS extension, `flood_zones`, spatial index, and lookup function.
-- `supabase/functions/determine-zone/` - Edge Function request handler and geocoder chain.
-- `scripts/` - NFHL download, ingestion, and spatial validation helpers.
-- `dags/` - Airflow quarterly refresh DAG and utilities.
-- `zuplo/` - Gateway route and policy configuration.
-- `docs/` - API reference, setup guide, data provenance, and FEMA zone codes.
+- `supabase/migrations/` — PostGIS extension, `flood_zones`, spatial index, and lookup function.
+- `supabase/functions/zonecheck/` — Unified edge function (geocode → flood lookup → Verixio bridge).
+- `supabase/functions/determine-zone/` — Legacy flood-only edge function (no Verixio bridge).
+- `scripts/` — NFHL download, ingestion, and spatial validation helpers.
+- `zuplo/` — Gateway route and policy configuration (legacy).
+- `docs/` — API reference, setup guide, data provenance, and FEMA zone codes.
 
-Free-tier keys should apply both `rate-limit-free.ts` for the 50 request/month
-quota and `rate-limit-free-burst.ts` for the 10 request/minute spike limit.
-
-## Local Validation
+## Local Development
 
 ```bash
+# Start Supabase stack
+supabase start
+
+# Deploy the zonecheck function
+supabase functions deploy zonecheck
+
+# Run Deno tests
 deno test --allow-read --allow-net=deno.land,esm.sh tests
-supabase db push --dry-run
 ```
 
-Full production validation requires a Supabase project, ingested NFHL state data,
-Zuplo API keys, and Stripe metered billing credentials.
+## Migration from FloodLens
 
-Airflow workers should install `dags/requirements.txt` in addition to providing
-GDAL/ogr2ogr and psql on the worker PATH. Set the Airflow Variable or
-environment variable `FLOODLENS_INGEST_SCRIPT_PATH` if `ingest_nfhl.sh` is not
-available at `/opt/airflow/scripts/ingest_nfhl.sh`.
+This project was renamed from FloodLens to ZoneCheck. The old `determine-zone` edge function is still deployed for backward compatibility. All new integrations should use `zonecheck` which includes the Verixio neighbourhood risk bridge.
+
+To update existing callers: change the URL path from `/functions/v1/determine-zone` to `/functions/v1/zonecheck`. The request/response format is identical with the addition of the `neighborhood` field.

@@ -2,7 +2,7 @@
 
 ## Primary Source: FEMA National Flood Hazard Layer (NFHL)
 
-FloodLens is powered by the **FEMA National Flood Hazard Layer (NFHL)**, the authoritative federal dataset of flood hazard areas in the United States.
+ZoneCheck is powered by the **FEMA National Flood Hazard Layer (NFHL)**, the authoritative federal dataset of flood hazard areas in the United States.
 
 ### What is the NFHL?
 
@@ -58,6 +58,18 @@ Addresses are resolved to coordinates using a two-tier approach:
 
 ---
 
+## Secondary Source: Verixio Rating Engine (Denver)
+
+For addresses that geocode within Denver County, ZoneCheck also queries the **Verixio Rating Engine** — a parcel-intelligence scoring system that evaluates:
+
+- **NTS** — Neighbourhood Trust Score
+- **TCS** — Transaction Confidence Score
+- **VGD** — Value Gap Differential
+
+The Verixio bridge is configured via the `VERIXIO_URL` environment variable on the Supabase Edge Function. When unset, `neighborhood` returns `null` for all addresses.
+
+---
+
 ## Disclaimer
 
-FloodLens is intended for informational purposes only. Flood zone determinations from this API should **not** be used as a substitute for an official FEMA flood zone determination (Standard Flood Zone Determination Form, SFDF) required for federally regulated lending transactions. Always consult a licensed flood zone determination service or FEMA's official Letter of Map Amendment (LOMA) process for official determinations.
+ZoneCheck is intended for informational purposes only. Flood zone determinations from this API should **not** be used as a substitute for an official FEMA flood zone determination (Standard Flood Zone Determination Form, SFDF) required for federally regulated lending transactions. Always consult a licensed flood zone determination service or FEMA's official Letter of Map Amendment (LOMA) process for official determinations.

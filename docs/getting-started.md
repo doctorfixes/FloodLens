@@ -1,16 +1,16 @@
 # Getting Started
 
-FloodLens converts a US address into a structured FEMA flood zone determination.
+ZoneCheck converts a US address into a structured FEMA flood zone determination.
 
 ## 1. Get an API Key
 
-Create an API key in your FloodLens dashboard. API keys are managed by Zuplo and
+Create an API key in your ZoneCheck dashboard. API keys are managed by Zuplo and
 carry tier metadata for rate limiting and Stripe metering.
 
 ## 2. Make Your First Request
 
 ```bash
-curl -X POST "https://YOUR_ZUPLO_GATEWAY/v1/determine-zone" \
+curl -X POST "https://YOUR_SUPABASE_PROJECT.supabase.co/functions/v1/zonecheck" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"address": "123 Main St, Miami, FL 33101"}'
@@ -22,6 +22,7 @@ The main response fields are:
 
 - `coordinates`: WGS 84 latitude and longitude used for the lookup.
 - `geocode_source`: `census` or `google`.
+- `neighborhood`: Verixio neighbourhood risk scores (NTS, TCS, VGD) when available.
 - `determination.zone_code`: FEMA zone code such as `AE`, `VE`, `X`, or `D`.
 - `determination.risk_level`: `HIGH`, `MODERATE`, `MINIMAL`, `UNDETERMINED`, or `UNKNOWN`.
 - `determination.panel_number`: FIRM panel identifier when available; otherwise `null`.

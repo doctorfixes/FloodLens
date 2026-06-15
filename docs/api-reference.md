@@ -3,12 +3,12 @@
 ## Endpoint
 
 ```http
-POST /v1/determine-zone
+POST /v1/zonecheck
 Content-Type: application/json
 Authorization: Bearer YOUR_API_KEY
 ```
 
-Returns a FEMA flood zone determination for a US street address.
+Returns a unified property risk profile — FEMA flood zone determination plus Verixio neighbourhood risk scores — for a US street address.
 
 ## Request Body
 
@@ -41,6 +41,7 @@ Returns a FEMA flood zone determination for a US street address.
     "eff_date": "2010-09-27",
     "disclaimer": "This result is derived from FEMA National Flood Hazard Layer (NFHL) data..."
   },
+  "neighborhood": null,
   "unmapped": false,
   "requested_at": "2026-05-11T00:00:00.000Z",
   "disclaimer": "This result is derived from FEMA National Flood Hazard Layer (NFHL) data..."
