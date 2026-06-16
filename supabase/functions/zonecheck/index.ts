@@ -26,24 +26,27 @@ export interface FloodRiskClient {
   rpc(functionName: string, args: { p_lat: number; p_lng: number }): RpcBuilder;
 }
 
-// ── Verixio neighbourhood risk bridge (cached) ────────────────────────────
+// ── Verixio neighbourhood risk bridge (Deno.Kv cached) ────────────────────
 //
 // Called as part of the unified ZoneCheck response. If the geocoded address
 // falls within Denver, the nearest parcel's NTS/TCS/VGD scores are included.
 // For addresses outside Denver this endpoint gracefully returns null.
 //
-// Results are cached in-memory by rounded lat/lng with a 5-minute TTL,
-// so repeated lookups of the same parcel return in <1ms instead of ~400ms.
+// Results are cached in Deno.Kv (persistent, survives cold starts) by rounded
+// lat/lng with a 5-minute TTL, so repeated lookups of the same parcel return
+// in <1ms instead of ~400ms — even across container restarts.
 
 const VERIXIO_TIMEOUT_MS = 8000;
 const VERIXIO_SEARCH_RADIUS_M = 500;
 const VERIXIO_CACHE_TTL_MS = 300_000; // 5 minutes
 
-interface CacheEntry {
-  data: Record<string, unknown> | null;
-  expiresAt: number;
+let _kv: Deno.Kv | null = null;
+async function getKv(): Promise<Deno.Kv> {
+  if (!_kv) {
+    _kv = await Deno.openKv();
+  }
+  return _kv;
 }
-const _verixioCache = new Map<string, CacheEntry>();
 
 function cacheKey(lat: number, lng: number): string {
   // Round to 4 decimal places (~11m precision) — parcels at nearby
@@ -55,11 +58,13 @@ async function lookupNeighborhoodRisk(
   lat: number,
   lng: number,
 ): Promise<Record<string, unknown> | null> {
-  // Check cache first
+  // Check Deno.Kv cache first
   const key = cacheKey(lat, lng);
-  const cached = _verixioCache.get(key);
-  if (cached && Date.now() < cached.expiresAt) {
-    return cached.data;
+  const kv = await getKv();
+  const cached = await kv.get<Record<string, unknown> | null>(["verixio", key]);
+  if (cached.versionstamp !== null) {
+    // Cache hit (value may be null = cached "no result")
+    return cached.value;
   }
 
   const verixioUrl = Deno.env.get("VERIXIO_URL");
@@ -85,8 +90,9 @@ async function lookupNeighborhoodRisk(
     // Verixio unavailable — degrade gracefully (cache null too so we don't hammer it)
   }
 
-  // Cache the result (both hits and misses prevent redundant calls)
-  _verixioCache.set(key, { data: result, expiresAt: Date.now() + VERIXIO_CACHE_TTL_MS });
+  // Cache the result in Deno.Kv (both hits and misses prevent redundant calls)
+  // expireIn is in milliseconds — same 5-minute window as before
+  await kv.set(["verixio", key], result, { expireIn: VERIXIO_CACHE_TTL_MS });
   return result;
 }
 
