@@ -33,7 +33,7 @@ export interface FloodRiskClient {
 // For addresses outside Denver this endpoint gracefully returns null.
 
 const VERIXIO_TIMEOUT_MS = 8000;
-const VERIXIO_SEARCH_RADIUS_M = 100;
+const VERIXIO_SEARCH_RADIUS_M = 500;
 
 async function lookupNeighborhoodRisk(
   lat: number,
@@ -42,18 +42,16 @@ async function lookupNeighborhoodRisk(
   const verixioUrl = Deno.env.get("VERIXIO_URL");
   if (!verixioUrl) return null; // Verixio not configured — silently skip
 
+  // Verixio /parcel/by-coordinates is a GET endpoint with query parameters
+  const url = new URL(verixioUrl);
+  url.searchParams.set("lat", String(lat));
+  url.searchParams.set("lon", String(lng));
+  url.searchParams.set("radius_meters", String(VERIXIO_SEARCH_RADIUS_M));
+
   try {
-    const res = await fetch(verixioUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({
-        lat,
-        lon: lng,
-        radius_meters: VERIXIO_SEARCH_RADIUS_M,
-      }),
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: { "Accept": "application/json" },
       signal: AbortSignal.timeout(VERIXIO_TIMEOUT_MS),
     });
     if (!res.ok) return null;
