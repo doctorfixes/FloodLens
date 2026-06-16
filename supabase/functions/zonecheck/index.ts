@@ -26,19 +26,42 @@ export interface FloodRiskClient {
   rpc(functionName: string, args: { p_lat: number; p_lng: number }): RpcBuilder;
 }
 
-// ── Verixio neighbourhood risk bridge ──────────────────────────────────────
+// ── Verixio neighbourhood risk bridge (cached) ────────────────────────────
 //
 // Called as part of the unified ZoneCheck response. If the geocoded address
 // falls within Denver, the nearest parcel's NTS/TCS/VGD scores are included.
 // For addresses outside Denver this endpoint gracefully returns null.
+//
+// Results are cached in-memory by rounded lat/lng with a 5-minute TTL,
+// so repeated lookups of the same parcel return in <1ms instead of ~400ms.
 
 const VERIXIO_TIMEOUT_MS = 8000;
 const VERIXIO_SEARCH_RADIUS_M = 500;
+const VERIXIO_CACHE_TTL_MS = 300_000; // 5 minutes
+
+interface CacheEntry {
+  data: Record<string, unknown> | null;
+  expiresAt: number;
+}
+const _verixioCache = new Map<string, CacheEntry>();
+
+function cacheKey(lat: number, lng: number): string {
+  // Round to 4 decimal places (~11m precision) — parcels at nearby
+  // coordinates will be within the search radius, so they share a cache entry.
+  return `${lat.toFixed(4)},${lng.toFixed(4)}`;
+}
 
 async function lookupNeighborhoodRisk(
   lat: number,
   lng: number,
 ): Promise<Record<string, unknown> | null> {
+  // Check cache first
+  const key = cacheKey(lat, lng);
+  const cached = _verixioCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.data;
+  }
+
   const verixioUrl = Deno.env.get("VERIXIO_URL");
   if (!verixioUrl) return null; // Verixio not configured — silently skip
 
@@ -48,17 +71,23 @@ async function lookupNeighborhoodRisk(
   url.searchParams.set("lon", String(lng));
   url.searchParams.set("radius_meters", String(VERIXIO_SEARCH_RADIUS_M));
 
+  let result: Record<string, unknown> | null = null;
   try {
     const res = await fetch(url.toString(), {
       method: "GET",
       headers: { "Accept": "application/json" },
       signal: AbortSignal.timeout(VERIXIO_TIMEOUT_MS),
     });
-    if (!res.ok) return null;
-    return await res.json() as Record<string, unknown>;
+    if (res.ok) {
+      result = await res.json() as Record<string, unknown>;
+    }
   } catch {
-    return null; // Verixio unavailable — degrade gracefully
+    // Verixio unavailable — degrade gracefully (cache null too so we don't hammer it)
   }
+
+  // Cache the result (both hits and misses prevent redundant calls)
+  _verixioCache.set(key, { data: result, expiresAt: Date.now() + VERIXIO_CACHE_TTL_MS });
+  return result;
 }
 
 // ── Handler dependencies ──────────────────────────────────────────────────
