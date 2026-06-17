@@ -41,9 +41,17 @@ const VERIXIO_SEARCH_RADIUS_M = 500;
 const VERIXIO_CACHE_TTL_MS = 300_000; // 5 minutes
 
 let _kv: Deno.Kv | null = null;
-async function getKv(): Promise<Deno.Kv> {
+let _kvAvailable = true;
+async function getKv(): Promise<Deno.Kv | null> {
+  if (!_kvAvailable) return null;
   if (!_kv) {
-    _kv = await Deno.openKv();
+    try {
+      _kv = await Deno.openKv();
+    } catch {
+      // Deno.Kv not available (Free plan) — disable and degrade gracefully
+      _kvAvailable = false;
+      return null;
+    }
   }
   return _kv;
 }
@@ -61,10 +69,12 @@ async function lookupNeighborhoodRisk(
   // Check Deno.Kv cache first
   const key = cacheKey(lat, lng);
   const kv = await getKv();
-  const cached = await kv.get<Record<string, unknown> | null>(["verixio", key]);
-  if (cached.versionstamp !== null) {
-    // Cache hit (value may be null = cached "no result")
-    return cached.value;
+  if (kv) {
+    const cached = await kv.get<Record<string, unknown> | null>(["verixio", key]);
+    if (cached.versionstamp !== null) {
+      // Cache hit (value may be null = cached "no result")
+      return cached.value;
+    }
   }
 
   const verixioUrl = Deno.env.get("VERIXIO_URL");
@@ -92,7 +102,9 @@ async function lookupNeighborhoodRisk(
 
   // Cache the result in Deno.Kv (both hits and misses prevent redundant calls)
   // expireIn is in milliseconds — same 5-minute window as before
-  await kv.set(["verixio", key], result, { expireIn: VERIXIO_CACHE_TTL_MS });
+  if (kv) {
+    await kv.set(["verixio", key], result, { expireIn: VERIXIO_CACHE_TTL_MS });
+  }
   return result;
 }
 
