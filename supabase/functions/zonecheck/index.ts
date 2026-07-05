@@ -56,7 +56,7 @@ async function getKv(): Promise<Deno.Kv | null> {
   return _kv;
 }
 
-function cacheKey(lat: number, lng: number): string {
+export function cacheKey(lat: number, lng: number): string {
   // Round to 4 decimal places (~11m precision) — parcels at nearby
   // coordinates will be within the search radius, so they share a cache entry.
   return `${lat.toFixed(4)},${lng.toFixed(4)}`;
@@ -221,11 +221,12 @@ export async function handleDetermineZoneRequest(
   const determination = data && data.length > 0 ? data[0] : null;
 
   // ── Neighborhood risk lookup (Verixio bridge) ─────────────────────────
-  let neighborhoodRisk: Record<string, unknown> | null = null;
-  if (determination !== null || true) {
-    // Attempt neighborhood lookup regardless of flood zone result
-    neighborhoodRisk = await deps.lookupNeighborhoodRisk(coords.lat, coords.lng);
-  }
+  // Attempted regardless of whether a flood zone was matched; degrades to
+  // null when Verixio is unconfigured or unavailable.
+  const neighborhoodRisk = await deps.lookupNeighborhoodRisk(
+    coords.lat,
+    coords.lng,
+  );
 
   const response: DetermineZoneResponse = {
     address,
