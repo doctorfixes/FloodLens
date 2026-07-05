@@ -5,15 +5,15 @@ import load_fema_data as loader
 
 # ── is_valid_bfe ───────────────────────────────────────────────────────────
 
-def test_is_valid_bfe_rejects_none_and_sentinels():
+def test_is_valid_bfe_rejects_none_and_sentinel():
     assert loader.is_valid_bfe(None) is False
     assert loader.is_valid_bfe(-9999) is False
-    # Boundary: the `> -9998` check also excludes exactly -9998.
-    assert loader.is_valid_bfe(-9998) is False
     assert loader.is_valid_bfe("not-a-number") is False
 
 
 def test_is_valid_bfe_accepts_real_values():
+    # -9998 is a real value: only -9999 is the "no data" sentinel.
+    assert loader.is_valid_bfe(-9998) is True
     assert loader.is_valid_bfe(-9997) is True
     assert loader.is_valid_bfe(0) is True
     assert loader.is_valid_bfe(452.0) is True
@@ -28,12 +28,11 @@ def test_escape_null_and_single_quotes():
     assert loader.escape("O'Brien") == "'O''Brien'"
 
 
-def test_escape_doubles_backslashes_current_behavior():
-    # Documents CURRENT behaviour. With PostgreSQL's default
-    # standard_conforming_strings=on, backslashes are literal, so doubling
-    # them corrupts the stored value. Flagged in the coverage analysis as a
-    # latent loader bug; pinned here so an intentional fix updates this test.
-    assert loader.escape("a\\b") == "'a\\\\b'"
+def test_escape_preserves_literal_backslashes():
+    # With PostgreSQL's default standard_conforming_strings=on, backslashes
+    # are literal inside a single-quoted string, so they must pass through
+    # unchanged. "a\\b" is the 3-char string a-backslash-b.
+    assert loader.escape("a\\b") == "'a\\b'"
 
 
 # ── feature_to_insert ──────────────────────────────────────────────────────
