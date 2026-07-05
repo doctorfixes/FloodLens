@@ -46,9 +46,18 @@ supabase start
 # Deploy the zonecheck function
 supabase functions deploy zonecheck
 
-# Run Deno tests
+# Run Deno tests (edge functions)
 deno test --allow-read --allow-net=deno.land,esm.sh tests
+
+# Run Python tests (Airflow utils + FEMA loader)
+pip install pytest requests
+python -m pytest tests/python -q
+
+# Run pgTAP tests (fn_get_flood_risk) — needs postgis + pgtap
+sudo -u postgres pg_prove -d floodlens_test tests/sql/*_test.sql
 ```
+
+All three suites also run in CI via `.github/workflows/test.yml`.
 
 ## Migration from FloodLens
 

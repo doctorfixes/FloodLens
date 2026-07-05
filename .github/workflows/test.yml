@@ -40,3 +40,30 @@ jobs:
 
       - name: Run Python pipeline tests
         run: python -m pytest tests/python -q
+
+  pgtap-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL, PostGIS and pgTAP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            postgresql-16-postgis-3 postgresql-16-pgtap pgtap
+
+      - name: Start PostgreSQL
+        run: sudo pg_ctlcluster 16 main start
+
+      - name: Create test database and load schema
+        run: |
+          sudo -u postgres psql -c "CREATE DATABASE floodlens_test;"
+          sudo -u postgres psql -d floodlens_test \
+            -c "CREATE EXTENSION IF NOT EXISTS postgis;" \
+            -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
+          sudo -u postgres psql -d floodlens_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/00002_create_flood_zones.sql \
+            -f supabase/migrations/00003_fn_get_flood_risk.sql
+
+      - name: Run pgTAP tests
+        run: sudo -u postgres pg_prove -d floodlens_test tests/sql/*_test.sql
