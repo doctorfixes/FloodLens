@@ -67,7 +67,7 @@ def is_valid_bfe(val) -> bool:
         return False
     try:
         v = float(val)
-        return v > -9998  # -9999 = no data
+        return v > -9999  # -9999 = no data sentinel
     except (ValueError, TypeError):
         return False
 
@@ -137,10 +137,16 @@ def feature_to_insert(f: dict) -> str:
 
 
 def escape(val) -> str:
-    """SQL-safe string literal or NULL."""
+    """SQL-safe string literal or NULL.
+
+    PostgreSQL runs with standard_conforming_strings=on by default, so
+    backslashes inside a single-quoted literal are ordinary characters.
+    Only single quotes need doubling; doubling backslashes would corrupt
+    the stored value.
+    """
     if val is None:
         return "NULL"
-    escaped = val.replace("'", "''").replace("\\", "\\\\")
+    escaped = val.replace("'", "''")
     return f"'{escaped}'"
 
 
