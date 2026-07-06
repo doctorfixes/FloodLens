@@ -1,9 +1,32 @@
 {
   "routes": [
     {
+      "path": "/v1/zonecheck",
+      "method": "POST",
+      "label": "Property Risk Profile",
+      "handler": {
+        "module": "$import(@zuplo/runtime)",
+        "export": "urlRewriteHandler",
+        "options": {
+          "rewritePattern": "${env.SUPABASE_FUNCTION_URL}/zonecheck",
+          "forwardSearch": false
+        }
+      },
+      "policies": {
+        "inbound": [
+          "api-key-inbound",
+          "rate-limit-inbound",
+          "request-validation-inbound"
+        ],
+        "outbound": [
+          "stripe-metered-billing-outbound"
+        ]
+      }
+    },
+    {
       "path": "/v1/determine-zone",
       "method": "POST",
-      "label": "Flood Zone Determination",
+      "label": "Flood Zone Determination (legacy)",
       "handler": {
         "module": "$import(@zuplo/runtime)",
         "export": "urlRewriteHandler",
