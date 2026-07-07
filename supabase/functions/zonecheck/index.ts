@@ -62,13 +62,43 @@ export function cacheKey(lat: number, lng: number): string {
   return `${lat.toFixed(4)},${lng.toFixed(4)}`;
 }
 
-async function lookupNeighborhoodRisk(
+// Minimal structural view of the Deno.Kv surface the bridge uses, so the
+// cache path can be exercised with an in-memory fake in tests.
+export interface KvLike {
+  get<T = unknown>(
+    key: unknown[],
+  ): Promise<{ value: T; versionstamp: string | null }>;
+  set(
+    key: unknown[],
+    value: unknown,
+    options?: { expireIn?: number },
+  ): Promise<unknown>;
+}
+
+// Injectable side effects for the Verixio lookup. Defaults wire the real
+// Deno.Kv, fetch, and environment; tests pass fakes.
+export interface NeighborhoodDeps {
+  openKv(): Promise<KvLike | null>;
+  fetch: typeof fetch;
+  getEnv(name: string): string | undefined;
+}
+
+function defaultNeighborhoodDeps(): NeighborhoodDeps {
+  return {
+    openKv: getKv as unknown as () => Promise<KvLike | null>,
+    fetch: globalThis.fetch.bind(globalThis),
+    getEnv: (name: string) => Deno.env.get(name),
+  };
+}
+
+export async function lookupNeighborhoodRisk(
   lat: number,
   lng: number,
+  deps: NeighborhoodDeps = defaultNeighborhoodDeps(),
 ): Promise<Record<string, unknown> | null> {
-  // Check Deno.Kv cache first
+  // Check the Deno.Kv cache first
   const key = cacheKey(lat, lng);
-  const kv = await getKv();
+  const kv = await deps.openKv();
   if (kv) {
     const cached = await kv.get<Record<string, unknown> | null>(["verixio", key]);
     if (cached.versionstamp !== null) {
@@ -77,7 +107,7 @@ async function lookupNeighborhoodRisk(
     }
   }
 
-  const verixioUrl = Deno.env.get("VERIXIO_URL");
+  const verixioUrl = deps.getEnv("VERIXIO_URL");
   if (!verixioUrl) return null; // Verixio not configured — silently skip
 
   // Verixio /parcel/by-coordinates is a GET endpoint with query parameters
@@ -88,7 +118,7 @@ async function lookupNeighborhoodRisk(
 
   let result: Record<string, unknown> | null = null;
   try {
-    const res = await fetch(url.toString(), {
+    const res = await deps.fetch(url.toString(), {
       method: "GET",
       headers: { "Accept": "application/json" },
       signal: AbortSignal.timeout(VERIXIO_TIMEOUT_MS),
