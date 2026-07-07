@@ -57,7 +57,27 @@ python -m pytest tests/python -q
 sudo -u postgres pg_prove -d floodlens_test tests/sql/*_test.sql
 ```
 
-All three suites also run in CI via `.github/workflows/test.yml`.
+All three suites also run in CI via `.github/workflows/test.yml`, along with an
+end-to-end multi-state ingestion check (`tests/integration/`).
+
+## Ingesting Flood Data
+
+The FEMA loader is not limited to Denver — pass a bounding box, a region label,
+and a target Supabase project:
+
+```bash
+export SUPABASE_SERVICE_KEY="..."
+
+# Denver metro (default)
+python scripts/load_fema_data.py
+
+# Any other region — use --bbox=... so a leading-negative longitude is not
+# parsed as an option flag.
+python scripts/load_fema_data.py \
+  --name "Miami-Dade FL" \
+  --bbox=-80.9,25.1,-80.1,25.9 \
+  --project-ref your-project-ref
+```
 
 ## Migration from FloodLens
 

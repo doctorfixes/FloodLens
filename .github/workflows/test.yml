@@ -67,3 +67,6 @@ jobs:
 
       - name: Run pgTAP tests
         run: sudo -u postgres pg_prove -d floodlens_test tests/sql/*_test.sql
+
+      - name: Verify multi-state ingestion (non-Denver, end-to-end)
+        run: python3 tests/integration/verify_multistate_ingest.py --database floodlens_test

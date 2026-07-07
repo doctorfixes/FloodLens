@@ -2,14 +2,30 @@
 """
 Paginated FEMA NFHL data loader for ZoneCheck.
 
-Downloads flood zone features from FEMA's ArcGIS REST API (Layer 28, NFHL),
-converts to SQL INSERT statements, and executes via Supabase Management API.
+Downloads flood zone features from FEMA's ArcGIS REST API (Layer 28, NFHL) for
+a bounding box, converts them to SQL INSERT statements, and executes them via
+the Supabase Management API.
+
+The bounding box, region label, and target Supabase project are all
+configurable, so the loader can ingest any state/metro — not just Denver.
 
 Usage:
+  # Denver metro (default), project from $SUPABASE_PROJECT_REF or built-in
   python scripts/load_fema_data.py
-  SUPABASE_SERVICE_KEY="..." python scripts/load_fema_data.py
+
+  # Miami-Dade, FL into a specific project. Use --bbox=... (equals form) so a
+  # leading-negative longitude is not parsed as an option flag.
+  python scripts/load_fema_data.py \
+    --name "Miami-Dade FL" \
+    --bbox=-80.9,25.1,-80.1,25.9 \
+    --project-ref abcdefghijklmnop
+
+Environment:
+  SUPABASE_SERVICE_KEY / SUPABASE_ACCESS_TOKEN  Management API bearer token.
+  SUPABASE_PROJECT_REF                          Default project ref (overridable via --project-ref).
 """
 
+import argparse
 import json
 import os
 import sys
@@ -21,11 +37,11 @@ import urllib.error
 
 FEMA_BASE = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query"
 
-# Denver metro bounding box (lat/lon, EPSG:4326 envelope)
-MIN_X, MIN_Y = -105.1, 39.6
-MAX_X, MAX_Y = -104.9, 39.8
+# Default region: Denver metro bounding box (min_x, min_y, max_x, max_y) in EPSG:4326.
+DEFAULT_BBOX = (-105.1, 39.6, -104.9, 39.8)
 
-SUPABASE_PROJECT_REF = "htnufvbzsfdfadnnfnje"
+DEFAULT_PROJECT_REF = "htnufvbzsfdfadnnfnje"
+SUPABASE_PROJECT_REF = os.environ.get("SUPABASE_PROJECT_REF", DEFAULT_PROJECT_REF)
 
 # Get service key from env or try SUPABASE_ACCESS_TOKEN
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_ACCESS_TOKEN", "")
@@ -35,19 +51,39 @@ BATCH_SIZE = 50      # Max INSERTs per SQL query (payload size management)
 
 # ── Helper functions ──────────────────────────────────────────────────────
 
-def fetch_page(offset: int, count: int = PAGE_SIZE) -> dict:
-    """Fetch one page of FEMA features."""
+def geometry_param(bbox) -> str:
+    """Build the ArcGIS envelope geometry query fragment for a bounding box."""
+    min_x, min_y, max_x, max_y = bbox
+    return (
+        f"&geometry={min_x}%2C{min_y}%2C{max_x}%2C{max_y}"
+        f"&geometryType=esriGeometryEnvelope&inSR=4326"
+    )
+
+
+def count_features(bbox, fema_base: str = FEMA_BASE) -> int:
+    """Return the total NFHL feature count within the bounding box."""
     params = (
         f"where=1%3D1"
-        f"&geometry={MIN_X}%2C{MIN_Y}%2C{MAX_X}%2C{MAX_Y}"
-        f"&geometryType=esriGeometryEnvelope&inSR=4326"
+        f"{geometry_param(bbox)}"
+        f"&returnGeometry=false&returnCountOnly=true&f=json"
+    )
+    url = f"{fema_base}?{params}"
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        return json.loads(resp.read().decode()).get("count", 0)
+
+
+def fetch_page(offset: int, count: int, bbox, fema_base: str = FEMA_BASE) -> dict:
+    """Fetch one page of FEMA features for the bounding box."""
+    params = (
+        f"where=1%3D1"
+        f"{geometry_param(bbox)}"
         f"&outFields=*"
         f"&returnGeometry=true&f=geojson"
         f"&outSR=4326"
         f"&resultOffset={offset}"
         f"&resultRecordCount={count}"
     )
-    url = f"{FEMA_BASE}?{params}"
+    url = f"{fema_base}?{params}"
     req = urllib.request.Request(url)
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
@@ -133,7 +169,15 @@ def feature_to_insert(f: dict) -> str:
         escape(zone_subtype)
     ])
 
-    return f"INSERT INTO public.flood_zones ({cols}) VALUES ({vals}) ON CONFLICT ON CONSTRAINT idx_flood_zones_unique_source_feature DO NOTHING;"
+    # Dedup target is the partial UNIQUE INDEX idx_flood_zones_unique_source_feature
+    # (state_fips, source_feature_id, eff_date) WHERE source_feature_id IS NOT NULL.
+    # It is an index, not a named constraint, so ON CONFLICT must infer it by
+    # column list + predicate — `ON CONFLICT ON CONSTRAINT <index>` is invalid.
+    return (
+        f"INSERT INTO public.flood_zones ({cols}) VALUES ({vals}) "
+        f"ON CONFLICT (state_fips, source_feature_id, eff_date) "
+        f"WHERE source_feature_id IS NOT NULL DO NOTHING;"
+    )
 
 
 def escape(val) -> str:
@@ -150,13 +194,14 @@ def escape(val) -> str:
     return f"'{escaped}'"
 
 
-def run_sql(sql: str) -> dict:
-    """Execute SQL on Supabase via Management API."""
-    url = f"https://api.supabase.com/v1/projects/{SUPABASE_PROJECT_REF}/database/query"
+def run_sql(sql: str, project_ref: str, service_key: str = "") -> dict:
+    """Execute SQL on Supabase via the Management API."""
+    service_key = service_key or SUPABASE_SERVICE_KEY
+    url = f"https://api.supabase.com/v1/projects/{project_ref}/database/query"
     payload = json.dumps({"query": sql}).encode()
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
-    req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_KEY}")
+    req.add_header("Authorization", f"Bearer {service_key}")
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
             return {"ok": True, "body": resp.read().decode()[:500]}
@@ -165,26 +210,60 @@ def run_sql(sql: str) -> dict:
         return {"ok": False, "code": e.code, "body": body[:1000]}
 
 
+# ── CLI ────────────────────────────────────────────────────────────────────
+
+def _bbox(s: str):
+    """argparse type: parse 'min_x,min_y,max_x,max_y' into a tuple of floats."""
+    parts = s.split(",")
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError("bbox must be 'min_x,min_y,max_x,max_y'")
+    try:
+        return tuple(float(p) for p in parts)
+    except ValueError:
+        raise argparse.ArgumentTypeError("bbox values must be numbers")
+
+
+def parse_args(argv=None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Load FEMA NFHL flood zones for a bounding box into Supabase."
+    )
+    p.add_argument(
+        "--bbox", type=_bbox, default=DEFAULT_BBOX,
+        help="Bounding box 'min_x,min_y,max_x,max_y' in EPSG:4326 (default: Denver metro).",
+    )
+    p.add_argument(
+        "--project-ref", default=SUPABASE_PROJECT_REF,
+        help="Supabase project ref to load into (default: $SUPABASE_PROJECT_REF or built-in).",
+    )
+    p.add_argument(
+        "--name", default="region",
+        help="Human-readable region label used in log output.",
+    )
+    p.add_argument(
+        "--page-size", type=int, default=PAGE_SIZE,
+        help=f"FEMA API page size (default: {PAGE_SIZE}).",
+    )
+    return p.parse_args(argv)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
-def main():
+def main(argv=None):
+    args = parse_args(argv)
+
     if not SUPABASE_SERVICE_KEY:
         print("ERROR: SUPABASE_SERVICE_KEY or SUPABASE_ACCESS_TOKEN not set.", file=sys.stderr)
         sys.exit(1)
 
+    bbox = args.bbox
+    project_ref = args.project_ref
+    name = args.name
+    page_size = args.page_size
+
     # Step 1: Get total count
-    print("Getting feature count...")
-    params = (
-        f"where=1%3D1"
-        f"&geometry={MIN_X}%2C{MIN_Y}%2C{MAX_X}%2C{MAX_Y}"
-        f"&geometryType=esriGeometryEnvelope&inSR=4326"
-        f"&returnGeometry=false&returnCountOnly=true&f=json"
-    )
-    url = f"{FEMA_BASE}?{params}"
-    with urllib.request.urlopen(url, timeout=30) as resp:
-        count_data = json.loads(resp.read().decode())
-    total = count_data.get("count", 0)
-    print(f"Total features in Denver bounding box: {total}")
+    print(f"Getting feature count for {name}...")
+    total = count_features(bbox)
+    print(f"Total features in {name} bounding box: {total}")
 
     if total == 0:
         print("No features found. Exiting.")
@@ -194,10 +273,10 @@ def main():
     all_sql = []
     seen_zones = set()
 
-    for offset in range(0, total, PAGE_SIZE):
-        actual_page = min(PAGE_SIZE, total - offset)
+    for offset in range(0, total, page_size):
+        actual_page = min(page_size, total - offset)
         print(f"  Fetching offset {offset} ({actual_page} features)...")
-        data = fetch_page(offset, actual_page)
+        data = fetch_page(offset, actual_page, bbox)
         features = data.get("features", [])
         print(f"    Got {len(features)} features")
         for f in features:
@@ -223,7 +302,7 @@ def main():
         pct = int(i / len(all_sql) * 100)
         print(f"  [{pct}%] Batch {i//BATCH_SIZE + 1}/{-(-len(all_sql)//BATCH_SIZE)} ({len(batch)} INSERTs)...", end=" ")
 
-        result = run_sql(batch_sql)
+        result = run_sql(batch_sql, project_ref)
         if result["ok"]:
             success += len(batch)
             print("OK")
@@ -242,16 +321,19 @@ def main():
     # Step 4: Verify
     print("\nVerifying with a test query...")
     test_sql = "SELECT m_zone_code, COUNT(*) as cnt FROM public.flood_zones GROUP BY m_zone_code ORDER BY m_zone_code;"
-    result = run_sql(test_sql)
+    result = run_sql(test_sql, project_ref)
     if result["ok"]:
         print(f"Result: {result['body']}")
     else:
         print(f"Verify error: {result['body']}")
 
-    # Test flood risk function for a Denver location
-    print("\nTesting fn_get_flood_risk for a Denver address...")
-    test_risk = "SELECT * FROM public.fn_get_flood_risk(39.74, -104.99);"
-    result = run_sql(test_risk)
+    # Test the flood risk function at the bounding-box centre.
+    min_x, min_y, max_x, max_y = bbox
+    center_lat = (min_y + max_y) / 2
+    center_lng = (min_x + max_x) / 2
+    print(f"\nTesting fn_get_flood_risk at {name} centre ({center_lat:.4f}, {center_lng:.4f})...")
+    test_risk = f"SELECT * FROM public.fn_get_flood_risk({center_lat}, {center_lng});"
+    result = run_sql(test_risk, project_ref)
     if result["ok"]:
         print(f"Flood risk: {result['body']}")
     else:
