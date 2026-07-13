@@ -65,3 +65,6 @@ enabled = false
 
 [functions.zonecheck]
 verify_jwt = false
+
+[functions.determine-zone]
+verify_jwt = false
