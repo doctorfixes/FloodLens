@@ -88,9 +88,10 @@ async function lookupNeighborhoodRisk(
 
   let result: Record<string, unknown> | null = null;
   try {
+    const apiKey = Deno.env.get("VERIXIO_API_KEY") || "";
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: { "Accept": "application/json" },
+      headers: { "Accept": "application/json", "X-API-Key": apiKey },
       signal: AbortSignal.timeout(VERIXIO_TIMEOUT_MS),
     });
     if (res.ok) {
