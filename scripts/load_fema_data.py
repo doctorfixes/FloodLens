@@ -25,9 +25,8 @@ FEMA_BASE = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer
 MIN_X, MIN_Y = -105.1, 39.6
 MAX_X, MAX_Y = -104.9, 39.8
 
-SUPABASE_PROJECT_REF = "htnufvbzsfdfadnnfnje"
+SUPABASE_PROJECT_REF = os.environ.get("SUPABASE_PROJECT_REF", "htnufvbzsfdfadnnfnje")
 
-# Get service key from env or try SUPABASE_ACCESS_TOKEN
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_ACCESS_TOKEN", "")
 
 PAGE_SIZE = 500      # Max results per API call

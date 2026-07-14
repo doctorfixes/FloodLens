@@ -1,62 +1,53 @@
-# ZoneCheck — Queued Backlog / Session Handoff
+# ZoneCheck — Remaining Backlog
 
-Snapshot of outstanding work, queued for a future session. Written 2026-07-05.
+Updated 2026-07-14.
 
-## Where things stand
+## What's done
 
-- **Test coverage + CI** were just added in **PR #24** (branch
-  `claude/test-coverage-analysis-lm8c90`): Deno tests for the production
-  `zonecheck` function, a Python `pytest` suite (`tests/python/`), and a pgTAP
-  suite for `fn_get_flood_risk` (`tests/sql/`), all wired into
-  `.github/workflows/test.yml` (3 jobs). **Check whether #24 is merged before
-  building on it.**
-- Two loader bugs were fixed in #24 — `scripts/load_fema_data.py` `escape()`
-  (stop doubling backslashes) and `is_valid_bfe()` (`> -9999`). If you are
-  reading this on a branch off `main` where those still look unfixed, it just
-  means #24 hasn't merged yet. Do **not** redo them.
-- **Data is Denver-only.** The sole loaded dataset is
-  `supabase/migrations/00004_load_denver_flood_zones.sql` (~2,348 features,
-  bbox `-105.1..-104.9 / 39.6..39.8`). Any address outside Denver returns
-  `unmapped: true, determination: null`. Today this is a Denver pilot, not a
-  national service.
+- **Test coverage + CI** — Deno (handler + geocoder), Python (validation,
+  fema_client, db_client, load_fema_data, DAG decision logic), pgTAP
+  (fn_get_flood_risk). All run in `.github/workflows/test.yml`.
+- **`/v1/zonecheck` gateway route** — Added to `zuplo/zuplo.json` with
+  api-key, rate-limit, request-validation, and stripe-metered-billing policies.
+- **Deploy workflows consolidated** — Single `deploy-functions.yml` replaces
+  three overlapping workflows; uses `SUPABASE_PROJECT_ID` secret (no hardcoded
+  project ref).
+- **Bug fixes** — `escape()`, `is_valid_bfe()`, dead-code guard, Deno.Kv
+  degradation, Verixio API key header.
 
-## Prioritized backlog
+## Requires human-provisioned keys
 
-1. **[Highest] Add a `/v1/zonecheck` Zuplo gateway route.**
-   `zuplo/zuplo.json` only routes the **legacy** `/v1/determine-zone`, so the
-   production Edge Function has no API-key auth, rate limiting, or billing in
-   front of it. Add a zonecheck route rewriting to
-   `${env.SUPABASE_FUNCTION_URL}/zonecheck` with the same inbound policies
-   (`api-key`, `rate-limit`, `request-validation`) and the stripe outbound
-   policy. Consider deprecating the determine-zone route.
+| Secret | Where to set | What breaks without it |
+|---|---|---|
+| `SUPABASE_ACCESS_TOKEN` | GitHub repo secret | Deploy workflows skip (no deploys on push to main) |
+| `SUPABASE_PROJECT_ID` | GitHub repo secret | Same — deploy + migration validation workflows skip |
+| `GOOGLE_MAPS_API_KEY` | Supabase Function Secrets | Geocoding fallback disabled; Census failures return 502 |
+| `STRIPE_SECRET_KEY` | Zuplo environment variable | Metered billing no-ops (silent, by design) |
+| `VERIXIO_URL` | Supabase Function Secrets | Neighborhood risk returns null (graceful degradation) |
+| `VERIXIO_API_KEY` | Supabase Function Secrets | Verixio requests fail auth (if the endpoint requires it) |
+| `SUPABASE_DB_URL` | Airflow Variable or env | NFHL refresh DAG cannot connect to database |
+| `SUPABASE_SERVICE_KEY` | env for `load_fema_data.py` | FEMA loader script cannot execute SQL |
 
-2. **Prove multi-state NFHL ingestion beyond Denver.**
-   Validate `scripts/ingest_nfhl.sh` (ogr2ogr path) and/or
-   `scripts/load_fema_data.py` (REST path) for at least one additional state;
-   confirm rows land and `fn_get_flood_risk` returns correct results outside
-   Denver. Note `load_fema_data.py`'s bounding box + `SUPABASE_PROJECT_REF`
-   are currently hard-coded to Denver.
+## Remaining code-level backlog
 
-3. **Validate / deploy the Airflow quarterly refresh DAG.**
-   `dags/nfhl_refresh_dag.py` is marked "planned"; target states FL/TX/CA/NY/LA
-   have no data yet. It is not deployed or run end-to-end.
+1. **Multi-state NFHL ingestion** — `scripts/load_fema_data.py` is
+   Denver-hardcoded (bbox, project ref). Branch `claude/multistate-ingestion`
+   has the parameterized version + ON CONFLICT fix. Needs merge decision.
 
-4. **Wire and test Stripe metered billing.**
-   `zuplo/policies/stripe-metered-billing.ts` is attached only to the legacy
-   route, marked "planned", and untested. Wire it to zonecheck and add tests.
+2. **Verixio bridge testability** — `lookupNeighborhoodRisk` in
+   `supabase/functions/zonecheck/index.ts` uses module-level Deno.Kv and
+   `fetch` directly. Branch `claude/verixio-bridge-tests` refactors to
+   injectable deps with 8 tests. Needs merge decision.
 
-5. **Test the Verixio bridge internals.**
-   `lookupNeighborhoodRisk` network/timeout path and the `Deno.Kv` cache
-   hit/miss/null logic in `supabase/functions/zonecheck/index.ts` are
-   uncovered (only the handler wiring is tested). Needs a small refactor to
-   make the cache injectable/testable.
+3. **Stripe billing tests** — Branch `claude/stripe-billing-tests` extracts
+   billing logic into a testable core module with 7 tests. Needs merge
+   decision.
 
-6. **Finish the determine-zone → zonecheck rename retirement.**
-   Once the gateway and callers are migrated, retire the legacy function,
-   route, and deploy workflow.
+4. **Retire `determine-zone`** — Legacy function is structurally identical to
+   `zonecheck` minus Verixio. Once callers migrate to `/v1/zonecheck`, remove
+   the function, its deploy step, its Zuplo route, and its `config.toml`
+   entry.
 
-## Suggested sequencing
-
-Do **1** first (the production function currently has nothing in front of it),
-then **2** to move past the Denver-only limitation, then **3–6** as the data
-layer and billing stabilize.
+5. **Hardcoded project ref in `load_fema_data.py`** — Line 28 still has the
+   project ref inline. The multi-state branch fixes this; if not merging that
+   branch, at minimum move to an env var.
