@@ -35,3 +35,6 @@ venv/
 .vscode/
 *.swp
 *.swo
+
+# Nested git repos (not submodules)
+zonecheck/

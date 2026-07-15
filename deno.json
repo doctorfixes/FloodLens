@@ -1,0 +1,15 @@
+{
+  "tasks": {
+    "check": "deno check supabase/functions/zonecheck/index.ts supabase/functions/determine-zone/index.ts tests/zonecheck.test.ts tests/determine-zone.test.ts tests/geocoder.test.ts",
+    "test": "deno test --allow-read --allow-env --allow-net=deno.land,esm.sh tests/",
+    "lint": "deno lint"
+  },
+  "imports": {
+    "@std/assert": "https://deno.land/std@0.208.0/assert/mod.ts",
+    "@std/http/server": "https://deno.land/std@0.177.0/http/server.ts",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+  },
+  "fmt": {
+    "exclude": ["supabase/migrations"]
+  }
+}
